@@ -1,9 +1,9 @@
 use countedindex::Index;
 use multiqueue::{InnerSend, InnerRecv, MPMC, MultiQueue, FutInnerSend, FutInnerRecv,
-                 FutInnerUniRecv, SendError, futures_multiqueue};
+                 FutInnerUniRecv, futures_multiqueue};
 use wait::Wait;
 
-use std::sync::mpsc::{TrySendError, TryRecvError, RecvError};
+use std::sync::mpsc::{TrySendError, TryRecvError, RecvError, SendError};
 
 extern crate futures;
 use self::futures::{Async, Poll, Sink, Stream, StartSend};

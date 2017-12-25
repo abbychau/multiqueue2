@@ -1,8 +1,5 @@
-
-use std::any::Any;
 use std::cell::Cell;
 use std::collections::VecDeque;
-use std::error::Error;
 use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
@@ -10,7 +7,7 @@ use std::ptr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, fence};
 use std::sync::atomic::Ordering::*;
-use std::sync::mpsc::{TrySendError, TryRecvError, RecvError};
+use std::sync::mpsc::{TrySendError, TryRecvError, RecvError, SendError};
 use std::thread::yield_now;
 
 use alloc;
@@ -733,40 +730,6 @@ impl<RW: QueueRW<T>, R, F: FnMut(&T) -> R, T> FutInnerUniRecv<RW, R, F, T> {
 }
 
 //////// Fut stream/sink implementations
-
-// The mpsc SendError struct can't be constructed according to rustc
-// since it's a struct and the ctor is private. Copied and pasted here
-
-/// Error type for sending, used when the receiving end of the channel is
-/// dropped
-pub struct SendError<T>(T);
-
-impl<T> fmt::Debug for SendError<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.debug_tuple("SendError").field(&"...").finish()
-    }
-}
-
-impl<T> fmt::Display for SendError<T> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "send failed because receiver is gone")
-    }
-}
-
-impl<T> Error for SendError<T>
-    where T: Any
-{
-    fn description(&self) -> &str {
-        "send failed because receiver is gone"
-    }
-}
-
-impl<T> SendError<T> {
-    /// Returns the message that was attempted to be sent but failed.
-    pub fn into_inner(self) -> T {
-        self.0
-    }
-}
 
 impl<RW: QueueRW<T>, T> Sink for FutInnerSend<RW, T> {
     type SinkItem = T;
