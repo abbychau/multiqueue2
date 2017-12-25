@@ -320,4 +320,4 @@ pub use broadcast::{BroadcastSender, BroadcastReceiver, BroadcastUniReceiver, Br
                     broadcast_queue_with, broadcast_fut_queue};
 
 pub use mpmc::{MPMCSender, MPMCReceiver, MPMCUniReceiver, MPMCFutSender, MPMCFutReceiver,
-               MPMCFutUniReceiver, mpmc_queue, mpmc_queue_with, mpmc_fut_queue};
+               MPMCFutUniReceiver, SendError, mpmc_queue, mpmc_queue_with, mpmc_fut_queue};
