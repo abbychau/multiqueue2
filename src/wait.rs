@@ -32,7 +32,7 @@ pub fn load_tagless(val: &AtomicUsize) -> usize {
 pub fn check(seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
     let cur_count = load_tagless(at);
     use std::{thread, time};
-    thread::sleep(time::Duration::from_nanos(10));
+    thread::sleep(time::Duration::from_nanos(1000));
     wc.load(Relaxed) == 0 || seq == cur_count || past(seq, cur_count).1
 
 }
