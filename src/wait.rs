@@ -125,7 +125,7 @@ impl Wait for BusyWait {
             }
 
             use std::{thread, time};
-            thread::sleep(time::Duration::from_nanos(1000));
+            thread::sleep(time::Duration::from_millis(1));
         }
     }
 
