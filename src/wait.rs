@@ -31,7 +31,10 @@ pub fn load_tagless(val: &AtomicUsize) -> usize {
 #[inline(always)]
 pub fn check(seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
     let cur_count = load_tagless(at);
+    use std::{thread, time};
+    thread::sleep(time::Duration::from_nanos(10));
     wc.load(Relaxed) == 0 || seq == cur_count || past(seq, cur_count).1
+
 }
 
 /// This is the trait that something implements to allow receivers
@@ -123,9 +126,6 @@ impl Wait for BusyWait {
             if check(seq, w_pos, wc) {
                 return;
             }
-
-            use std::{thread, time};
-            thread::sleep(time::Duration::from_millis(10));
         }
     }
 
