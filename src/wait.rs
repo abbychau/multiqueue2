@@ -14,7 +14,8 @@
 //! ```
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::AtomicUsize;
-use std::thread::yield_now;
+use std::thread::{yield_now,sleep};
+use std::time;
 
 use countedindex::{past, rm_tag};
 extern crate parking_lot;
@@ -31,6 +32,7 @@ pub fn load_tagless(val: &AtomicUsize) -> usize {
 #[inline(always)]
 pub fn check(seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
     let cur_count = load_tagless(at);
+    yield_now();
     if is_x86_feature_detected!("sse2") {
         #[cfg(target_arch = "x86")]
         use std::arch::x86::_mm_pause;
@@ -40,8 +42,7 @@ pub fn check(seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
             _mm_pause();
         }
     }else{
-        use std::{thread, time};
-        thread::sleep(time::Duration::from_millis(DEFAULT_CHECK_DELAY));
+        sleep(time::Duration::from_millis(DEFAULT_CHECK_DELAY));
     }
     wc.load(Relaxed) == 0 || seq == cur_count || past(seq, cur_count).1
 
@@ -157,7 +158,6 @@ impl Wait for YieldingWait {
             }
         }
         loop {
-            yield_now();
             for _ in 0..self.spins_yield {
                 if check(seq, w_pos, wc) {
                     return;
