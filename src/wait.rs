@@ -14,15 +14,14 @@
 //! ```
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::AtomicUsize;
-use std::thread::{yield_now,sleep};
-use std::time;
+use std::thread::yield_now;
 
 use countedindex::{past, rm_tag};
 extern crate parking_lot;
 
 pub const DEFAULT_YIELD_SPINS: usize = 50;
 pub const DEFAULT_TRY_SPINS: usize = 1000;
-pub const DEFAULT_CHECK_DELAY: u64 = 10;
+pub const DEFAULT_CHECK_DELAY: u64 = 20;
 
 #[inline(always)]
 pub fn load_tagless(val: &AtomicUsize) -> usize {
@@ -32,20 +31,9 @@ pub fn load_tagless(val: &AtomicUsize) -> usize {
 #[inline(always)]
 pub fn check(seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
     let cur_count = load_tagless(at);
-    yield_now();
-    if is_x86_feature_detected!("sse2") {
-        #[cfg(target_arch = "x86")]
-        use std::arch::x86::_mm_pause;
-        #[cfg(target_arch = "x86_64")]
-        use std::arch::x86_64::_mm_pause;
-        unsafe{
-            _mm_pause();
-        }
-    }else{
-        sleep(time::Duration::from_millis(DEFAULT_CHECK_DELAY));
-    }
+    use std::{thread, time};
+    thread::sleep(time::Duration::from_millis(DEFAULT_CHECK_DELAY));
     wc.load(Relaxed) == 0 || seq == cur_count || past(seq, cur_count).1
-
 }
 
 /// This is the trait that something implements to allow receivers
@@ -158,6 +146,7 @@ impl Wait for YieldingWait {
             }
         }
         loop {
+            yield_now();
             for _ in 0..self.spins_yield {
                 if check(seq, w_pos, wc) {
                     return;
