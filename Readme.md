@@ -1,6 +1,6 @@
 # MultiQueue2: Fast MPMC Broadcast Queue
 
-MultiQueue2 is a fast bounded mpmc queue that supports broadcast/broadcast style operations [![Build Status](https://travis-ci.org/schets/multiqueue.svg?branch=master)](https://travis-ci.org/abbychau/multiqueue2)
+MultiQueue2 is a fast bounded mpmc queue that supports broadcast/broadcast style operations [![Build Status](https://travis-ci.org/schets/multiqueue.svg?branch=master)](https://travis-ci.org/abbychau/multiqueue)
 
 [MultiQueue](https://github.com/schets/multiqueue) is a mpmc library developed by Sam Schetterer, but not updated for some time. I found it very useful as it implements `futures`. However, it is with a few outdated library API and the use of spin locks is taking 100% CPU in many cases. This version tries to fix these.
 
