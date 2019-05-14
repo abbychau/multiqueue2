@@ -1,5 +1,5 @@
 [package]
-name = "multiqueue2"
+name = "multiqueue"
 version = "0.1.0"
 authors = ["Sam Schetterer <samschet@gmail.com>, Abby <i@abby.md>"]
 license = "MIT"

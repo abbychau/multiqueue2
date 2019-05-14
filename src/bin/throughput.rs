@@ -1,5 +1,5 @@
 extern crate crossbeam;
-extern crate multiqueue2 as multiqueue;
+extern crate multiqueue;
 extern crate time;
 
 use multiqueue::{BroadcastReceiver, BroadcastSender, broadcast_queue_with, wait};
