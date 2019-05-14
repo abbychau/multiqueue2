@@ -1,11 +1,11 @@
 [package]
-name = "multiqueue"
-version = "0.3.4"
+name = "multiqueue2"
+version = "0.1.0"
 authors = ["Sam Schetterer <samschet@gmail.com>, Abby <i@abby.md>"]
 license = "MIT"
 description = "A fast mpmc broadcast queue"
-repository = "https://github.com/schets/multiqueue"
-documentation = "https://docs.rs/multiqueue"
+repository = "https://github.com/abbychau/multiqueue"
+documentation = "https://docs.rs/multiqueue2"
 readme = "Readme.md"
 keywords = ["queue", "mpmc", "lockless", "broadcast", "message"]
 categories = ['asynchronous', 'concurrency', 'data-structures', 'algorithms']
