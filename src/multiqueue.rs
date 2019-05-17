@@ -482,10 +482,8 @@ impl<RW: QueueRW<T>, T> InnerSend<RW, T> {
         // the performance of the queue. I suspect the compiler
         // always sets up a stack from regardless of the condition
         // and that hurts optimizations around it.
-        if val.is_ok() {
-            if self.queue.needs_notify {
-                self.queue.waiter.notify();
-            }
+        if val.is_ok() && self.queue.needs_notify {
+            self.queue.waiter.notify();
         }
         val
     }
@@ -823,7 +821,7 @@ impl FutWait {
     pub fn with_spins(spins_first: usize, spins_yield: usize) -> FutWait {
         FutWait {
             spins_first: spins_first,
-            spins_yield: spins_yield,
+            spins_yield,
             parked: parking_lot::Mutex::new(VecDeque::new()),
         }
     }
@@ -881,9 +879,9 @@ impl FutWait {
         match f(val) {
             Err(TrySendError::Full(v)) => {
                 parked.push_back(current());
-                return Err(TrySendError::Full(v));
+                Err(TrySendError::Full(v))
             }
-            v => return v,
+            v => v,
         }
     }
 

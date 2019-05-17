@@ -378,7 +378,7 @@ impl<T: Clone> BroadcastReceiver<T> {
     ///     }
     /// }
     /// ```
-    pub fn try_iter<'a>(&'a self) -> BroadcastRefIter<'a, T> {
+    pub fn try_iter(&'_ self) -> BroadcastRefIter<'_, T> {
         BroadcastRefIter { recv: self }
     }
 }
@@ -531,7 +531,7 @@ impl<T: Clone + Sync> BroadcastUniReceiver<T> {
     /// }
     /// ```
     pub fn iter_with<R, F: FnMut(&T) -> R>(self, op: F) -> BroadcastUniIter<R, F, T> {
-        BroadcastUniIter { recv: self, op: op }
+        BroadcastUniIter { recv: self, op }
     }
 
     /// Returns a non-owning iterator that iterates over the queue
@@ -552,11 +552,8 @@ impl<T: Clone + Sync> BroadcastUniReceiver<T> {
     ///     }
     /// }
     /// ```
-    pub fn try_iter_with<'a, R, F: FnMut(&T) -> R>(
-        &'a self,
-        op: F,
-    ) -> BroadcastUniRefIter<'a, R, F, T> {
-        BroadcastUniRefIter { recv: self, op: op }
+    pub fn try_iter_with<R, F: FnMut(&T) -> R>(&self, op: F) -> BroadcastUniRefIter<R, F, T> {
+        BroadcastUniRefIter { recv: self, op }
     }
 }
 

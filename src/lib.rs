@@ -301,7 +301,7 @@
 //! }
 //! ```
 
-#![cfg_attr(feature = "cargo-clippy", allow(inline_always))]
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::inline_always))]
 
 mod alloc;
 mod atomicsignal;

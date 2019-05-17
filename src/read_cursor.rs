@@ -90,11 +90,11 @@ impl Reader {
     /// Could this be done in a more compiler-friendly way
     #[inline(always)]
     pub fn load_attempt(&self, ord: Ordering) -> ReadAttempt {
-        if self.state.get() == ReaderState::Multi {
-            if unsafe { (*self.meta).num_consumers.load(Ordering::Relaxed) } == 1 {
-                fence(Ordering::Acquire);
-                self.state.set(ReaderState::Single);
-            }
+        if self.state.get() == ReaderState::Multi
+            && unsafe { (*self.meta).num_consumers.load(Ordering::Relaxed) } == 1
+        {
+            fence(Ordering::Acquire);
+            self.state.set(ReaderState::Single);
         }
         unsafe {
             ReadAttempt {

@@ -100,8 +100,8 @@ impl YieldingWait {
     /// and then yields every spins_yield spins.
     pub fn with_spins(spins_first: usize, spins_yield: usize) -> YieldingWait {
         YieldingWait {
-            spins_first: spins_first,
-            spins_yield: spins_yield,
+            spins_first,
+            spins_yield,
         }
     }
 }
@@ -116,8 +116,8 @@ impl BlockingWait {
     /// and then yields for spins_yield spins, then blocks on a condition variable.
     pub fn with_spins(spins_first: usize, spins_yield: usize) -> BlockingWait {
         BlockingWait {
-            spins_first: spins_first,
-            spins_yield: spins_yield,
+            spins_first,
+            spins_yield,
             lock: parking_lot::Mutex::new(false),
             condvar: parking_lot::Condvar::new(),
         }

@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-const UPDATE_EPOCH: usize = 1 << 0;
+const UPDATE_EPOCH: usize = 1;
 const NO_READER: usize = 1 << 1;
 
 pub struct AtomicSignal {
