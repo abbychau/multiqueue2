@@ -1,12 +1,14 @@
 use countedindex::Index;
-use multiqueue::{InnerSend, InnerRecv, FutInnerSend, FutInnerRecv, FutInnerUniRecv, BCast,
-                 MultiQueue, futures_multiqueue};
+use multiqueue::{
+    futures_multiqueue, BCast, FutInnerRecv, FutInnerSend, FutInnerUniRecv, InnerRecv, InnerSend,
+    MultiQueue,
+};
 use wait::Wait;
 
-use std::sync::mpsc::{TrySendError, TryRecvError, RecvError, SendError};
+use std::sync::mpsc::{RecvError, SendError, TryRecvError, TrySendError};
 
 extern crate futures;
-use self::futures::{Async, Poll, Sink, Stream, StartSend};
+use self::futures::{Async, Poll, Sink, StartSend, Stream};
 
 /// This class is the sending half of the broadcasting ```MultiQueue```. It supports both
 /// single and multi consumer modes with competitive performance in each case.
@@ -126,7 +128,6 @@ pub struct BroadcastSender<T: Clone> {
 pub struct BroadcastReceiver<T: Clone> {
     receiver: InnerRecv<BCast<T>, T>,
 }
-
 
 /// This class is similar to the receiver, except it ensures that there
 /// is only one consumer for the stream it owns. This means that
@@ -333,7 +334,9 @@ impl<T: Clone> BroadcastReceiver<T> {
     ///
     /// ```
     pub fn add_stream(&self) -> BroadcastReceiver<T> {
-        BroadcastReceiver { receiver: self.receiver.add_stream() }
+        BroadcastReceiver {
+            receiver: self.receiver.add_stream(),
+        }
     }
 
     /// Removes the given reader from the queue subscription lib
@@ -403,7 +406,9 @@ impl<T: Clone + Sync> BroadcastReceiver<T> {
     /// ```
     pub fn into_single(self) -> Result<BroadcastUniReceiver<T>, BroadcastReceiver<T>> {
         if self.receiver.is_single() {
-            Ok(BroadcastUniReceiver { receiver: self.receiver })
+            Ok(BroadcastUniReceiver {
+                receiver: self.receiver,
+            })
         } else {
             Err(self)
         }
@@ -503,7 +508,9 @@ impl<T: Clone + Sync> BroadcastUniReceiver<T> {
     /// normal_r.clone();
     /// ```
     pub fn into_multi(self) -> BroadcastReceiver<T> {
-        BroadcastReceiver { receiver: self.receiver }
+        BroadcastReceiver {
+            receiver: self.receiver,
+        }
     }
 
     /// Returns a non-owning iterator that iterates over the queue
@@ -524,10 +531,7 @@ impl<T: Clone + Sync> BroadcastUniReceiver<T> {
     /// }
     /// ```
     pub fn iter_with<R, F: FnMut(&T) -> R>(self, op: F) -> BroadcastUniIter<R, F, T> {
-        BroadcastUniIter {
-            recv: self,
-            op: op,
-        }
+        BroadcastUniIter { recv: self, op: op }
     }
 
     /// Returns a non-owning iterator that iterates over the queue
@@ -548,13 +552,11 @@ impl<T: Clone + Sync> BroadcastUniReceiver<T> {
     ///     }
     /// }
     /// ```
-    pub fn try_iter_with<'a, R, F: FnMut(&T) -> R>(&'a self,
-                                                   op: F)
-                                                   -> BroadcastUniRefIter<'a, R, F, T> {
-        BroadcastUniRefIter {
-            recv: self,
-            op: op,
-        }
+    pub fn try_iter_with<'a, R, F: FnMut(&T) -> R>(
+        &'a self,
+        op: F,
+    ) -> BroadcastUniRefIter<'a, R, F, T> {
+        BroadcastUniRefIter { recv: self, op: op }
     }
 }
 
@@ -585,7 +587,9 @@ impl<T: Clone> BroadcastFutReceiver<T> {
     }
 
     pub fn add_stream(&self) -> BroadcastFutReceiver<T> {
-        BroadcastFutReceiver { receiver: self.receiver.add_stream() }
+        BroadcastFutReceiver {
+            receiver: self.receiver.add_stream(),
+        }
     }
 
     /// Identical to ```BroadcastReceiver::unsubscribe```
@@ -598,12 +602,14 @@ impl<T: Clone + Sync> BroadcastFutReceiver<T> {
     /// Analog of ```BroadcastReceiver::into_single```
     /// Since the ```BroadcastFutUniReceiver``` acts more like an iterator,
     /// this takes the operation to be applied to each value
-    pub fn into_single<R, F: FnMut(&T) -> R>
-        (self,
-         op: F)
-         -> Result<BroadcastFutUniReceiver<R, F, T>, (F, BroadcastFutReceiver<T>)> {
+    pub fn into_single<R, F: FnMut(&T) -> R>(
+        self,
+        op: F,
+    ) -> Result<BroadcastFutUniReceiver<R, F, T>, (F, BroadcastFutReceiver<T>)> {
         match self.receiver.into_single(op) {
-            Ok(sreceiver) => Ok(BroadcastFutUniReceiver { receiver: sreceiver }),
+            Ok(sreceiver) => Ok(BroadcastFutUniReceiver {
+                receiver: sreceiver,
+            }),
             Err((o, receiver)) => Err((o, BroadcastFutReceiver { receiver: receiver })),
         }
     }
@@ -623,17 +629,23 @@ impl<R, F: FnMut(&T) -> R, T: Clone + Sync> BroadcastFutUniReceiver<R, F, T> {
     }
 
     /// Adds a stream with the specified method
-    pub fn add_stream_with<RQ, FQ: FnMut(&T) -> RQ>(&self,
-                                                    op: FQ)
-                                                    -> BroadcastFutUniReceiver<RQ, FQ, T> {
-        BroadcastFutUniReceiver { receiver: self.receiver.add_stream_with(op) }
+    pub fn add_stream_with<RQ, FQ: FnMut(&T) -> RQ>(
+        &self,
+        op: FQ,
+    ) -> BroadcastFutUniReceiver<RQ, FQ, T> {
+        BroadcastFutUniReceiver {
+            receiver: self.receiver.add_stream_with(op),
+        }
     }
 
     /// Returns a new receiver on the same stream using a different method
-    pub fn transform_operation<RQ, FQ: FnMut(&T) -> RQ>(self,
-                                                        op: FQ)
-                                                        -> BroadcastFutUniReceiver<RQ, FQ, T> {
-        BroadcastFutUniReceiver { receiver: self.receiver.add_stream_with(op) }
+    pub fn transform_operation<RQ, FQ: FnMut(&T) -> RQ>(
+        self,
+        op: FQ,
+    ) -> BroadcastFutUniReceiver<RQ, FQ, T> {
+        BroadcastFutUniReceiver {
+            receiver: self.receiver.add_stream_with(op),
+        }
     }
 
     /// Identical to ```BroadcastReceiver::unsubscribe```
@@ -643,7 +655,9 @@ impl<R, F: FnMut(&T) -> R, T: Clone + Sync> BroadcastFutUniReceiver<R, F, T> {
 
     /// Transforms this back into ```BroadcastFutReceiver```, returning the new receiver
     pub fn into_multi(self) -> BroadcastFutReceiver<T> {
-        BroadcastFutReceiver { receiver: self.receiver.into_multi() }
+        BroadcastFutReceiver {
+            receiver: self.receiver.into_multi(),
+        }
     }
 }
 
@@ -734,7 +748,6 @@ impl<T: Clone + Sync> IntoIterator for BroadcastUniReceiver<T> {
     }
 }
 
-
 pub struct BroadcastRefIter<'a, T: Clone + 'a> {
     recv: &'a BroadcastReceiver<T>,
 }
@@ -787,7 +800,6 @@ impl<'a, T: Clone + Sync + 'a> IntoIterator for &'a BroadcastUniReceiver<T> {
     }
 }
 
-
 pub struct BroadcastUniIter<R, F: FnMut(&T) -> R, T: Clone + Sync> {
     recv: BroadcastUniReceiver<T>,
     op: F,
@@ -836,7 +848,10 @@ impl<'a, R, F: FnMut(&T) -> R, T: Clone + Sync + 'a> Iterator for BroadcastUniRe
 /// ```
 pub fn broadcast_queue<T: Clone>(capacity: Index) -> (BroadcastSender<T>, BroadcastReceiver<T>) {
     let (send, recv) = MultiQueue::<BCast<T>, T>::new(capacity);
-    (BroadcastSender { sender: send }, BroadcastReceiver { receiver: recv })
+    (
+        BroadcastSender { sender: send },
+        BroadcastReceiver { receiver: recv },
+    )
 }
 
 /// Creates a (```BroadcastSender```, ```BroadcastReceiver```) pair with a capacity that's
@@ -851,20 +866,27 @@ pub fn broadcast_queue<T: Clone>(capacity: Index) -> (BroadcastSender<T>, Broadc
 /// assert_eq!(10, r.try_recv().unwrap());
 /// ```
 
-pub fn broadcast_queue_with<T: Clone, W: Wait + 'static>
-    (capacity: Index,
-     wait: W)
-     -> (BroadcastSender<T>, BroadcastReceiver<T>) {
+pub fn broadcast_queue_with<T: Clone, W: Wait + 'static>(
+    capacity: Index,
+    wait: W,
+) -> (BroadcastSender<T>, BroadcastReceiver<T>) {
     let (send, recv) = MultiQueue::<BCast<T>, T>::new_with(capacity, wait);
-    (BroadcastSender { sender: send }, BroadcastReceiver { receiver: recv })
+    (
+        BroadcastSender { sender: send },
+        BroadcastReceiver { receiver: recv },
+    )
 }
 
 /// Futures variant of broadcast_queue - datastructures implement
 /// Sink + Stream at a minor (~30 ns) performance cost to BlockingWait
-pub fn broadcast_fut_queue<T: Clone>(capacity: Index)
-                                     -> (BroadcastFutSender<T>, BroadcastFutReceiver<T>) {
+pub fn broadcast_fut_queue<T: Clone>(
+    capacity: Index,
+) -> (BroadcastFutSender<T>, BroadcastFutReceiver<T>) {
     let (isend, irecv) = futures_multiqueue::<BCast<T>, T>(capacity);
-    (BroadcastFutSender { sender: isend }, BroadcastFutReceiver { receiver: irecv })
+    (
+        BroadcastFutSender { sender: isend },
+        BroadcastFutReceiver { receiver: irecv },
+    )
 }
 
 unsafe impl<T: Send + Sync + Clone> Send for BroadcastSender<T> {}
@@ -880,8 +902,8 @@ mod test {
     use self::crossbeam::scope;
 
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{Arc, Barrier};
     use std::sync::mpsc::TryRecvError;
+    use std::sync::{Arc, Barrier};
     use std::thread::yield_now;
 
     #[test]
@@ -1032,9 +1054,10 @@ mod test {
                                 Ok(val) => {
                                     if (senders == 1) && (val != 0) && (val <= cur) {
                                         do_panic.fetch_add(1, Ordering::Relaxed);
-                                        panic!("Non-increasing values read {} last, val was {}",
-                                               cur,
-                                               val);
+                                        panic!(
+                                            "Non-increasing values read {} last, val was {}",
+                                            cur, val
+                                        );
                                     }
                                     cur = val;
                                     cref.fetch_add(1, Ordering::Relaxed);
@@ -1048,8 +1071,10 @@ mod test {
             }
             reader.unsubscribe();
         });
-        assert_eq!(senders * receivers * num_loop,
-                   counter.load(Ordering::SeqCst));
+        assert_eq!(
+            senders * receivers * num_loop,
+            counter.load(Ordering::SeqCst)
+        );
     }
 
     #[test]
@@ -1081,7 +1106,6 @@ mod test {
             reader.recv().unwrap();
         }
     }
-
 
     struct Dropper<'a> {
         aref: &'a AtomicUsize,

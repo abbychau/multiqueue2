@@ -13,12 +13,16 @@ pub struct LoadedSignal {
 
 impl AtomicSignal {
     pub fn new() -> AtomicSignal {
-        AtomicSignal { flags: AtomicUsize::new(0) }
+        AtomicSignal {
+            flags: AtomicUsize::new(0),
+        }
     }
 
     #[inline(always)]
     pub fn load(&self, ord: Ordering) -> LoadedSignal {
-        LoadedSignal { flags: self.flags.load(ord) }
+        LoadedSignal {
+            flags: self.flags.load(ord),
+        }
     }
 
     #[inline(always)]

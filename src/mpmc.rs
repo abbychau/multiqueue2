@@ -1,12 +1,14 @@
 use countedindex::Index;
-use multiqueue::{InnerSend, InnerRecv, MPMC, MultiQueue, FutInnerSend, FutInnerRecv,
-                 FutInnerUniRecv, futures_multiqueue};
+use multiqueue::{
+    futures_multiqueue, FutInnerRecv, FutInnerSend, FutInnerUniRecv, InnerRecv, InnerSend,
+    MultiQueue, MPMC,
+};
 use wait::Wait;
 
-use std::sync::mpsc::{TrySendError, TryRecvError, RecvError, SendError};
+use std::sync::mpsc::{RecvError, SendError, TryRecvError, TrySendError};
 
 extern crate futures;
-use self::futures::{Async, Poll, Sink, Stream, StartSend};
+use self::futures::{Async, Poll, Sink, StartSend, Stream};
 
 /// This class is the sending half of the mpmc ```MultiQueue```. It supports both
 /// single and multi consumer modes with competitive performance in each case.
@@ -60,7 +62,6 @@ pub struct MPMCSender<T> {
     sender: InnerSend<MPMC<T>, T>,
 }
 
-
 /// This is the receiving end of a standard mpmc view of the queue
 /// It functions similarly to the ```BroadcastReceiver``` execpt there
 /// is only ever one stream. As a result, the type doesn't need to be clone
@@ -71,7 +72,9 @@ pub struct MPMCReceiver<T> {
 
 impl<T> Clone for MPMCReceiver<T> {
     fn clone(&self) -> Self {
-        MPMCReceiver { receiver: self.receiver.clone() }
+        MPMCReceiver {
+            receiver: self.receiver.clone(),
+        }
     }
 }
 
@@ -244,7 +247,9 @@ impl<T> MPMCReceiver<T> {
     /// ```
     pub fn into_single(self) -> Result<MPMCUniReceiver<T>, MPMCReceiver<T>> {
         if self.receiver.is_single() {
-            Ok(MPMCUniReceiver { receiver: self.receiver })
+            Ok(MPMCUniReceiver {
+                receiver: self.receiver,
+            })
         } else {
             Err(self)
         }
@@ -282,7 +287,6 @@ impl<T> MPMCUniReceiver<T> {
     pub fn recv(&self) -> Result<T, RecvError> {
         self.receiver.recv()
     }
-
 
     /// Applies the passed function to the value in the queue without copying it out
     /// If there is no data in the queue or the writers have disconnected,
@@ -374,7 +378,9 @@ impl<T> MPMCUniReceiver<T> {
     /// normal_r.clone();
     /// ```
     pub fn into_multi(self) -> MPMCReceiver<T> {
-        MPMCReceiver { receiver: self.receiver }
+        MPMCReceiver {
+            receiver: self.receiver,
+        }
     }
 
     /// Returns a non-owning iterator that iterates over the queue
@@ -395,10 +401,7 @@ impl<T> MPMCUniReceiver<T> {
     /// }
     /// ```
     pub fn iter_with<R, F: FnMut(&T) -> R>(self, op: F) -> MPMCUniIter<R, F, T> {
-        MPMCUniIter {
-            recv: self,
-            op: op,
-        }
+        MPMCUniIter { recv: self, op: op }
     }
 
     /// Returns a non-owning iterator that iterates over the queue
@@ -420,10 +423,7 @@ impl<T> MPMCUniReceiver<T> {
     /// }
     /// ```
     pub fn try_iter_with<'a, R, F: FnMut(&T) -> R>(&'a self, op: F) -> MPMCUniRefIter<'a, R, F, T> {
-        MPMCUniRefIter {
-            recv: self,
-            op: op,
-        }
+        MPMCUniRefIter { recv: self, op: op }
     }
 }
 
@@ -461,12 +461,14 @@ impl<T> MPMCFutReceiver<T> {
     /// Analog of ```MPMCReceiver::into_single```
     /// Since the ```FutUniReceiver``` acts more like an iterator,
     /// this takes the operation to be applied to each value
-    pub fn into_single<R, F: FnMut(&T) -> R>
-        (self,
-         op: F)
-         -> Result<MPMCFutUniReceiver<R, F, T>, (F, MPMCFutReceiver<T>)> {
+    pub fn into_single<R, F: FnMut(&T) -> R>(
+        self,
+        op: F,
+    ) -> Result<MPMCFutUniReceiver<R, F, T>, (F, MPMCFutReceiver<T>)> {
         match self.receiver.into_single(op) {
-            Ok(sreceiver) => Ok(MPMCFutUniReceiver { receiver: sreceiver }),
+            Ok(sreceiver) => Ok(MPMCFutUniReceiver {
+                receiver: sreceiver,
+            }),
             Err((o, receiver)) => Err((o, MPMCFutReceiver { receiver: receiver })),
         }
     }
@@ -486,17 +488,23 @@ impl<R, F: FnMut(&T) -> R, T> MPMCFutUniReceiver<R, F, T> {
     }
 
     /// Adds a stream with the specified method
-    pub fn add_stream_with<RQ, FQ: FnMut(&T) -> RQ>(&self,
-                                                    op: FQ)
-                                                    -> MPMCFutUniReceiver<RQ, FQ, T> {
-        MPMCFutUniReceiver { receiver: self.receiver.add_stream_with(op) }
+    pub fn add_stream_with<RQ, FQ: FnMut(&T) -> RQ>(
+        &self,
+        op: FQ,
+    ) -> MPMCFutUniReceiver<RQ, FQ, T> {
+        MPMCFutUniReceiver {
+            receiver: self.receiver.add_stream_with(op),
+        }
     }
 
     /// Returns a new receiver on the same stream using a different method
-    pub fn transform_operation<RQ, FQ: FnMut(&T) -> RQ>(self,
-                                                        op: FQ)
-                                                        -> MPMCFutUniReceiver<RQ, FQ, T> {
-        MPMCFutUniReceiver { receiver: self.receiver.add_stream_with(op) }
+    pub fn transform_operation<RQ, FQ: FnMut(&T) -> RQ>(
+        self,
+        op: FQ,
+    ) -> MPMCFutUniReceiver<RQ, FQ, T> {
+        MPMCFutUniReceiver {
+            receiver: self.receiver.add_stream_with(op),
+        }
     }
 
     /// Identical to ```MPMCReceiver::unsubscribe```
@@ -506,13 +514,17 @@ impl<R, F: FnMut(&T) -> R, T> MPMCFutUniReceiver<R, F, T> {
 
     /// Transforms this back into ```MPMCFutReceiver```, returning the new receiver
     pub fn into_multi(self) -> MPMCFutReceiver<T> {
-        MPMCFutReceiver { receiver: self.receiver.into_multi() }
+        MPMCFutReceiver {
+            receiver: self.receiver.into_multi(),
+        }
     }
 }
 
 impl<T> Clone for MPMCFutSender<T> {
     fn clone(&self) -> Self {
-        MPMCFutSender { sender: self.sender.clone() }
+        MPMCFutSender {
+            sender: self.sender.clone(),
+        }
     }
 }
 
@@ -533,7 +545,9 @@ impl<T> Sink for MPMCFutSender<T> {
 
 impl<T> Clone for MPMCFutReceiver<T> {
     fn clone(&self) -> Self {
-        MPMCFutReceiver { receiver: self.receiver.clone() }
+        MPMCFutReceiver {
+            receiver: self.receiver.clone(),
+        }
     }
 }
 
@@ -556,7 +570,6 @@ impl<R, F: FnMut(&T) -> R, T> Stream for MPMCFutUniReceiver<R, F, T> {
         self.receiver.poll()
     }
 }
-
 
 pub struct MPMCIter<T> {
     recv: MPMCReceiver<T>,
@@ -714,9 +727,10 @@ pub fn mpmc_queue<T>(capacity: Index) -> (MPMCSender<T>, MPMCReceiver<T>) {
     (MPMCSender { sender: send }, MPMCReceiver { receiver: recv })
 }
 
-pub fn mpmc_queue_with<T, W: Wait + 'static>(capacity: Index,
-                                             w: W)
-                                             -> (MPMCSender<T>, MPMCReceiver<T>) {
+pub fn mpmc_queue_with<T, W: Wait + 'static>(
+    capacity: Index,
+    w: W,
+) -> (MPMCSender<T>, MPMCReceiver<T>) {
     let (send, recv) = MultiQueue::<MPMC<T>, T>::new_with(capacity, w);
     (MPMCSender { sender: send }, MPMCReceiver { receiver: recv })
 }
@@ -725,7 +739,10 @@ pub fn mpmc_queue_with<T, W: Wait + 'static>(capacity: Index,
 /// Sink + Stream at a minor (~30 ns) performance cost to ```BlockingWait```
 pub fn mpmc_fut_queue<T>(capacity: Index) -> (MPMCFutSender<T>, MPMCFutReceiver<T>) {
     let (isend, irecv) = futures_multiqueue::<MPMC<T>, T>(capacity);
-    (MPMCFutSender { sender: isend }, MPMCFutReceiver { receiver: irecv })
+    (
+        MPMCFutSender { sender: isend },
+        MPMCFutReceiver { receiver: irecv },
+    )
 }
 
 unsafe impl<T: Send> Send for MPMCSender<T> {}
@@ -741,8 +758,8 @@ mod test {
     use self::crossbeam::scope;
 
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{Arc, Barrier};
     use std::sync::mpsc::TryRecvError;
+    use std::sync::{Arc, Barrier};
     use std::thread::yield_now;
 
     #[test]
@@ -884,7 +901,6 @@ mod test {
         }
     }
 
-
     struct Dropper<'a> {
         aref: &'a AtomicUsize,
     }
@@ -946,7 +962,7 @@ mod test {
     fn test_recv_clone_item_noclone() {
         struct NoClone;
 
-        let (_, reader) = mpmc_queue::<NoClone>(10);
-        reader.clone();
+        let (_, _reader) = mpmc_queue::<NoClone>(10);
+        // reader.clone();
     }
 }

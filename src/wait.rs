@@ -12,8 +12,8 @@
 //! let _ = broadcast_queue_with::<usize, YieldingWait>(10, YieldingWait::new());
 //! let _ = broadcast_queue_with::<usize, BlockingWait>(10, BlockingWait::new());
 //! ```
-use std::sync::atomic::Ordering::Relaxed;
 use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::Relaxed;
 use std::thread::yield_now;
 
 use countedindex::{past, rm_tag};
@@ -31,9 +31,14 @@ pub fn load_tagless(val: &AtomicUsize) -> usize {
 #[inline(always)]
 pub fn check(seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
     let cur_count = load_tagless(at);
-    use std::{thread, time};
-    thread::sleep(time::Duration::from_millis(DEFAULT_CHECK_DELAY));
-    wc.load(Relaxed) == 0 || seq == cur_count || past(seq, cur_count).1
+
+    if wc.load(Relaxed) == 0 || seq == cur_count || past(seq, cur_count).1 {
+        true
+    } else {
+        use std::{thread, time};
+        thread::sleep(time::Duration::from_millis(DEFAULT_CHECK_DELAY));
+        false
+    }
 }
 
 /// This is the trait that something implements to allow receivers
@@ -164,7 +169,6 @@ impl Wait for YieldingWait {
     }
 }
 
-
 impl Wait for BlockingWait {
     #[cold]
     fn wait(&self, seq: usize, w_pos: &AtomicUsize, wc: &AtomicUsize) {
@@ -191,7 +195,6 @@ impl Wait for BlockingWait {
             if check(seq, w_pos, wc) {
                 return;
             }
-
         }
     }
 
@@ -218,7 +221,7 @@ impl Clone for BlockingWait {
 #[cfg(test)]
 mod test {
 
-    use std::sync::atomic::{AtomicUsize, fence, Ordering};
+    use std::sync::atomic::{fence, AtomicUsize, Ordering};
     use std::thread::yield_now;
 
     use super::*;

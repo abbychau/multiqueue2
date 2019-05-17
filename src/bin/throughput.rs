@@ -2,14 +2,14 @@ extern crate crossbeam;
 extern crate multiqueue;
 extern crate time;
 
-use multiqueue::{BroadcastReceiver, BroadcastSender, broadcast_queue_with, wait};
+use multiqueue::{broadcast_queue_with, wait, BroadcastReceiver, BroadcastSender};
 
 use time::precise_time_ns;
 
 use crossbeam::scope;
 
-use std::sync::Barrier;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Barrier;
 
 #[inline(never)]
 fn recv(bar: &Barrier, mreader: BroadcastReceiver<u64>, sum: &AtomicUsize, check: bool) {
@@ -55,24 +55,28 @@ fn runit(name: &str, n_senders: usize, n_readers: usize) {
     scope(|scope| {
         for _ in 0..n_senders {
             let w = writer.clone();
-            scope.spawn(move || { send(bref, w, num_do); });
+            scope.spawn(move || {
+                send(bref, w, num_do);
+            });
         }
         writer.unsubscribe();
         for _ in 0..n_readers {
             let aref = &ns_atomic;
             let r = reader.add_stream();
             let check = n_senders == 1;
-            scope.spawn(move || { recv(bref, r, aref, check); });
+            scope.spawn(move || {
+                recv(bref, r, aref, check);
+            });
         }
         reader.unsubscribe();
         bar.wait();
     });
     let ns_spent = (ns_atomic.load(Ordering::Relaxed) as f64) / n_readers as f64;
     let ns_per_item = ns_spent / (num_do as f64);
-    println!("Time spent doing {} push/pop pairs for {} was {} ns per item",
-             num_do,
-             name,
-             ns_per_item);
+    println!(
+        "Time spent doing {} push/pop pairs for {} was {} ns per item",
+        num_do, name, ns_per_item
+    );
 }
 
 fn main() {

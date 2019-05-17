@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-#[cfg(target_pointer_width="32")]
+#[cfg(target_pointer_width = "32")]
 mod index_data {
 
     pub type Index = u32;
@@ -12,7 +12,7 @@ mod index_data {
 
 }
 
-#[cfg(target_pointer_width="64")]
+#[cfg(target_pointer_width = "64")]
 mod index_data {
 
     pub type Index = u64;
@@ -56,13 +56,16 @@ pub fn get_valid_wrap(val: Index) -> Index {
 }
 
 fn validate_wrap(val: Index) {
-    assert!(val.is_power_of_two(),
-            "Multiqueue error - non power-of-two size received");
-    assert!(val <= MAX_WRAP,
-            "Multiqueue error - too large size received");
+    assert!(
+        val.is_power_of_two(),
+        "Multiqueue error - non power-of-two size received"
+    );
+    assert!(
+        val <= MAX_WRAP,
+        "Multiqueue error - too large size received"
+    );
     assert!(val > 0, "Multiqueue error - zero size received");
 }
-
 
 // A queue entry will never ever have this value as an initial valid flag
 pub const INITIAL_QUEUE_FLAG: usize = ::std::usize::MAX;
@@ -150,16 +153,17 @@ impl<'a> Transaction<'a> {
     #[inline(always)]
     pub fn commit(self, by: Index, ord: Ordering) -> Option<Transaction<'a>> {
         let store_val = rm_tag(self.loaded_vals.wrapping_add(by as usize));
-        match self.ptr.compare_exchange_weak(self.loaded_vals, store_val, ord, self.lord) {
+        match self
+            .ptr
+            .compare_exchange_weak(self.loaded_vals, store_val, ord, self.lord)
+        {
             Ok(_) => None,
-            Err(cval) => {
-                Some(Transaction {
-                         ptr: self.ptr,
-                         loaded_vals: cval,
-                         lord: self.lord,
-                         mask: self.mask,
-                     })
-            }
+            Err(cval) => Some(Transaction {
+                ptr: self.ptr,
+                loaded_vals: cval,
+                lord: self.lord,
+                mask: self.mask,
+            }),
         }
     }
 
@@ -210,22 +214,28 @@ mod tests {
 
     fn test_incr_param_threaded(wrap_size: Index, goaround: usize, nthread: usize) {
         let mycounted = CountedIndex::new(wrap_size);
-        scope(|scope| for _ in 0..nthread {
-                  scope.spawn(|| for _ in 0..goaround {
-                                  for _ in 0..wrap_size {
-                                      let mut trans = mycounted.load_transaction(Relaxed);
-                                      loop {
-                                          match trans.commit(1, Release) {
-                                              Some(new_t) => trans = new_t,
-                                              None => break,
-                                          }
-                                      }
-                                  }
-                              });
-              });
+        scope(|scope| {
+            for _ in 0..nthread {
+                scope.spawn(|| {
+                    for _ in 0..goaround {
+                        for _ in 0..wrap_size {
+                            let mut trans = mycounted.load_transaction(Relaxed);
+                            loop {
+                                match trans.commit(1, Release) {
+                                    Some(new_t) => trans = new_t,
+                                    None => break,
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        });
         assert_eq!(0, mycounted.load(Relaxed));
-        assert_eq!(wrap_size as usize * goaround * nthread,
-                   mycounted.load_count(Relaxed));
+        assert_eq!(
+            wrap_size as usize * goaround * nthread,
+            mycounted.load_count(Relaxed)
+        );
     }
 
     #[test]

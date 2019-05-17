@@ -305,19 +305,23 @@
 
 mod alloc;
 mod atomicsignal;
+mod broadcast;
 mod consume;
 mod countedindex;
 mod maybe_acquire;
 mod memory;
 mod mpmc;
 mod multiqueue;
-mod broadcast;
 mod read_cursor;
 pub mod wait;
 
-pub use broadcast::{BroadcastSender, BroadcastReceiver, BroadcastUniReceiver, BroadcastFutSender,
-                    BroadcastFutReceiver, BroadcastFutUniReceiver, broadcast_queue,
-                    broadcast_queue_with, broadcast_fut_queue};
+pub use broadcast::{
+    broadcast_fut_queue, broadcast_queue, broadcast_queue_with, BroadcastFutReceiver,
+    BroadcastFutSender, BroadcastFutUniReceiver, BroadcastReceiver, BroadcastSender,
+    BroadcastUniReceiver,
+};
 
-pub use mpmc::{MPMCSender, MPMCReceiver, MPMCUniReceiver, MPMCFutSender, MPMCFutReceiver,
-               MPMCFutUniReceiver, mpmc_queue, mpmc_queue_with, mpmc_fut_queue};
+pub use mpmc::{
+    mpmc_fut_queue, mpmc_queue, mpmc_queue_with, MPMCFutReceiver, MPMCFutSender,
+    MPMCFutUniReceiver, MPMCReceiver, MPMCSender, MPMCUniReceiver,
+};

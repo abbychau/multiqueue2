@@ -1,14 +1,16 @@
-extern crate multiqueue;
 extern crate crossbeam;
+extern crate multiqueue;
 
-use self::multiqueue::{broadcast_queue};
 use self::crossbeam::scope;
+use self::multiqueue::broadcast_queue;
 
 fn spsc_example() {
     let (send, recv) = broadcast_queue(4);
     scope(|scope| {
-        scope.spawn(move || for val in recv {
-            println!("Got {}", val);
+        scope.spawn(move || {
+            for val in recv {
+                println!("Got {}", val);
+            }
         });
 
         for i in 0..10 {
@@ -31,8 +33,10 @@ fn spsc_bcast_example() {
             let cur_recv = recv.add_stream();
             for j in 0..2 {
                 let stream_consumer = cur_recv.clone();
-                scope.spawn(move || for val in stream_consumer {
-                    println!("Stream {} consumer {} got {}", i, j, val);
+                scope.spawn(move || {
+                    for val in stream_consumer {
+                        println!("Stream {} consumer {} got {}", i, j, val);
+                    }
                 });
             }
         }
@@ -61,8 +65,10 @@ fn spmc_bcast_example() {
             let cur_recv = recv.add_stream();
             for j in 0..2 {
                 let stream_consumer = cur_recv.clone();
-                scope.spawn(move || for val in stream_consumer {
-                    println!("Stream {} consumer {} got {}", i, j, val);
+                scope.spawn(move || {
+                    for val in stream_consumer {
+                        println!("Stream {} consumer {} got {}", i, j, val);
+                    }
                 });
             }
             // cur_recv is dropped here
@@ -92,8 +98,10 @@ fn wacky_example() {
             let cur_recv = recv.add_stream();
             for j in 0..2 {
                 let stream_consumer = cur_recv.clone();
-                scope.spawn(move || for val in stream_consumer {
-                    println!("Stream {} consumer {} got {}", i, j, val);
+                scope.spawn(move || {
+                    for val in stream_consumer {
+                        println!("Stream {} consumer {} got {}", i, j, val);
+                    }
                 });
             }
             // cur_recv is dropped here
@@ -104,18 +112,20 @@ fn wacky_example() {
         // which can view items inline in the queue
         let single_recv = recv.add_stream().into_single().unwrap();
 
-        scope.spawn(move || for val in single_recv.iter_with(|item_ref| 10 * *item_ref) {
-            println!("{}", val);
+        scope.spawn(move || {
+            for val in single_recv.iter_with(|item_ref| 10 * *item_ref) {
+                println!("{}", val);
+            }
         });
 
         // Same as above, except this time we just want to iterate until the receiver is empty
         let single_recv_2 = recv.add_stream().into_single().unwrap();
 
-        scope.spawn(move || for val in
-            single_recv_2.try_iter_with(|item_ref| 10 * *item_ref) {
-            println!("{}", val);
+        scope.spawn(move || {
+            for val in single_recv_2.try_iter_with(|item_ref| 10 * *item_ref) {
+                println!("{}", val);
+            }
         });
-
 
         // Take notice that I drop the reader - this removes it from
         // the queue, meaning that the readers in the new threads

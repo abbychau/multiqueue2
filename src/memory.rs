@@ -1,11 +1,11 @@
 use std::mem;
 use std::ptr;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 
 use alloc;
 use atomicsignal::AtomicSignal;
-use maybe_acquire::{MAYBE_ACQUIRE, maybe_acquire_fence};
+use maybe_acquire::{maybe_acquire_fence, MAYBE_ACQUIRE};
 
 struct ToFree {
     mem: *mut u8,
@@ -65,7 +65,12 @@ impl MemoryManagerInner {
         let token = alloc::allocate(1);
         self.tokens.push(token as *const MemToken);
         unsafe {
-            ptr::write(token, MemToken { epoch: AtomicUsize::new(at) });
+            ptr::write(
+                token,
+                MemToken {
+                    epoch: AtomicUsize::new(at),
+                },
+            );
         }
         token as *const MemToken
     }
@@ -130,7 +135,8 @@ impl MemoryManager {
                 let mut newv = Vec::new();
                 mem::swap(&mut newv, elemvec);
                 inner.add_freeable(newv);
-                self.epoch.store(cur_epoch.wrapping_add(1), Ordering::Release);
+                self.epoch
+                    .store(cur_epoch.wrapping_add(1), Ordering::Release);
                 self.signal.set_epoch(Ordering::Release);
             }
         });

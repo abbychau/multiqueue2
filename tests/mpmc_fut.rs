@@ -2,13 +2,13 @@
 extern crate futures;
 extern crate multiqueue;
 
-use futures::{Future, Stream, Sink, Async};
 use futures::future::lazy;
+use futures::{Async, Future, Sink, Stream};
 
-use std::time::Duration;
-use std::thread;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 fn is_send<T: Send>() {}
 
@@ -46,7 +46,7 @@ fn send_recv_threads() {
     let (tx, rx) = multiqueue::mpmc_fut_queue::<i32>(16);
     let mut rx = rx.wait();
 
-    thread::spawn(move|| {
+    thread::spawn(move || {
         tx.send(1).wait().unwrap();
     });
 
@@ -58,7 +58,7 @@ fn send_recv_threads_no_capacity() {
     let (mut tx, rx) = multiqueue::mpmc_fut_queue::<i32>(0);
     let mut rx = rx.wait();
 
-    let t = thread::spawn(move|| {
+    let t = thread::spawn(move || {
         tx = tx.send(1).wait().unwrap();
         tx = tx.send(2).wait().unwrap();
     });
@@ -83,9 +83,10 @@ fn recv_close_gets_none() {
         drop(tx);
 
         Ok::<(), ()>(())
-    }).wait().unwrap();
+    })
+    .wait()
+    .unwrap();
 }
-
 
 #[test]
 fn tx_close_gets_none() {
@@ -97,7 +98,9 @@ fn tx_close_gets_none() {
         assert_eq!(rx.poll(), Ok(Async::Ready(None)));
 
         Ok::<(), ()>(())
-    }).wait().unwrap();
+    })
+    .wait()
+    .unwrap();
 }
 
 #[test]
@@ -107,7 +110,7 @@ fn stress_shared_bounded_hard() {
     let (tx, rx) = multiqueue::mpmc_fut_queue::<i32>(0);
     let mut rx = rx.wait();
 
-    let t = thread::spawn(move|| {
+    let t = thread::spawn(move || {
         for _ in 0..AMT * NTHREADS {
             assert_eq!(rx.next().unwrap(), Ok(1));
         }
@@ -120,7 +123,7 @@ fn stress_shared_bounded_hard() {
     for _ in 0..NTHREADS {
         let mut tx = tx.clone();
 
-        thread::spawn(move|| {
+        thread::spawn(move || {
             for _ in 0..AMT {
                 tx = tx.send(1).wait().unwrap();
             }
@@ -175,9 +178,7 @@ fn stress_receiver_multi_task_bounded_hard() {
                                         *lock = Some(rx);
                                         false
                                     }
-                                    Async::Ready(None) => {
-                                        true
-                                    }
+                                    Async::Ready(None) => true,
                                     Async::NotReady => {
                                         *lock = Some(rx);
                                         false
@@ -185,7 +186,9 @@ fn stress_receiver_multi_task_bounded_hard() {
                                 };
 
                                 Ok::<bool, ()>(r)
-                            }).wait().unwrap();
+                            })
+                            .wait()
+                            .unwrap();
 
                             if r {
                                 break;

@@ -1,9 +1,8 @@
-
 use std::sync::atomic::Ordering;
 
-#[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch="aarch64")))]
+#[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
 mod theimpl {
-    use std::sync::atomic::{Ordering, fence};
+    use std::sync::atomic::{fence, Ordering};
     pub const MAYBE_ACQUIRE: Ordering = Ordering::Relaxed;
 
     #[inline(always)]
@@ -12,7 +11,7 @@ mod theimpl {
     }
 }
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64", target_arch="aarch64"))]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64"))]
 mod theimpl {
     use std::sync::atomic::Ordering;
     pub const MAYBE_ACQUIRE: Ordering = Ordering::Acquire;

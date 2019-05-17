@@ -4,16 +4,16 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, fence};
 use std::sync::atomic::Ordering::*;
-use std::sync::mpsc::{TrySendError, TryRecvError, RecvError, SendError};
+use std::sync::atomic::{fence, AtomicUsize};
+use std::sync::mpsc::{RecvError, SendError, TryRecvError, TrySendError};
+use std::sync::Arc;
 use std::thread::yield_now;
 
 use alloc;
 use atomicsignal::LoadedSignal;
-use countedindex::{CountedIndex, get_valid_wrap, is_tagged, rm_tag, Index, INITIAL_QUEUE_FLAG};
-use memory::{MemoryManager, MemToken};
+use countedindex::{get_valid_wrap, is_tagged, rm_tag, CountedIndex, Index, INITIAL_QUEUE_FLAG};
+use memory::{MemToken, MemoryManager};
 use wait::*;
 
 use read_cursor::{ReadCursor, Reader};
@@ -23,8 +23,8 @@ extern crate futures;
 extern crate parking_lot;
 extern crate smallvec;
 
-use self::futures::{Async, AsyncSink, Poll, Sink, Stream, StartSend};
 use self::futures::task::{current, Task};
+use self::futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
 
 use self::atomic_utilities::artificial_dep::{dependently_mut, DepOrd};
 
@@ -212,9 +212,10 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
         MultiQueue::new_with(_capacity, BlockingWait::new())
     }
 
-    pub fn new_with<W: Wait + 'static>(capacity: Index,
-                                       wait: W)
-                                       -> (InnerSend<RW, T>, InnerRecv<RW, T>) {
+    pub fn new_with<W: Wait + 'static>(
+        capacity: Index,
+        wait: W,
+    ) -> (InnerSend<RW, T>, InnerRecv<RW, T>) {
         MultiQueue::new_internal(capacity, Arc::new(wait))
     }
 
@@ -397,11 +398,11 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
         }
     }
 
-    pub fn try_recv_view<R, F: FnOnce(&T) -> R>
-        (&self,
-         op: F,
-         reader: &Reader)
-         -> Result<R, (F, *const AtomicUsize, TryRecvError)> {
+    pub fn try_recv_view<R, F: FnOnce(&T) -> R>(
+        &self,
+        op: F,
+        reader: &Reader,
+    ) -> Result<R, (F, *const AtomicUsize, TryRecvError)> {
         let ctail_attempt = reader.load_attempt(Relaxed);
         unsafe {
             let (ctail, wrap_valid_tag) = ctail_attempt.get();
@@ -431,7 +432,10 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
             if tail_cache == current_tail {
                 return current_tail;
             }
-            match self.tail_cache.compare_exchange(tail_cache, current_tail, AcqRel, Relaxed) {
+            match self
+                .tail_cache
+                .compare_exchange(tail_cache, current_tail, AcqRel, Relaxed)
+            {
                 Ok(_) => current_tail,
                 Err(val) => val,
             }
@@ -441,10 +445,10 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
     }
 
     fn reload_tail_single(&self, count: usize) -> usize {
-        let max_diff_from_head = self.tail
-            .get_max_diff(count)
-            .expect("The write head got ran over by consumers in single writer mode. This \
-                     process is borked!");
+        let max_diff_from_head = self.tail.get_max_diff(count).expect(
+            "The write head got ran over by consumers in single writer mode. This \
+             process is borked!",
+        );
         let current_tail = CountedIndex::get_previous(count, max_diff_from_head);
         self.tail_cache.store(current_tail, Relaxed);
         current_tail
@@ -454,10 +458,7 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
 impl<RW: QueueRW<T>, T> InnerSend<RW, T> {
     #[inline(always)]
     pub fn try_send(&self, val: T) -> Result<(), TrySendError<T>> {
-        let signal = self.queue
-            .manager
-            .signal
-            .load(Relaxed);
+        let signal = self.queue.manager.signal.load(Relaxed);
         if signal.has_action() {
             let disconnected = self.handle_signals(signal);
             if disconnected {
@@ -560,7 +561,10 @@ impl<RW: QueueRW<T>, T> InnerRecv<RW, T> {
     pub fn add_stream(&self) -> InnerRecv<RW, T> {
         InnerRecv {
             queue: self.queue.clone(),
-            reader: self.queue.tail.add_stream(&self.reader, &self.queue.manager),
+            reader: self
+                .queue
+                .tail
+                .add_stream(&self.reader, &self.queue.manager),
             token: self.queue.manager.get_token(),
             alive: true,
         }
@@ -568,10 +572,7 @@ impl<RW: QueueRW<T>, T> InnerRecv<RW, T> {
 
     #[inline(always)]
     fn examine_signals(&self) {
-        let signal = self.queue
-            .manager
-            .signal
-            .load(Relaxed);
+        let signal = self.queue.manager.signal.load(Relaxed);
         if signal.has_action() {
             self.handle_signals(signal);
         }
@@ -584,7 +585,6 @@ impl<RW: QueueRW<T>, T> InnerRecv<RW, T> {
         }
     }
 
-
     pub fn unsubscribe(self) -> bool {
         self.reader.get_consumers() == 1
     }
@@ -594,11 +594,12 @@ impl<RW: QueueRW<T>, T> InnerRecv<RW, T> {
         if self.alive {
             self.alive = false;
             if self.reader.remove_consumer() == 1 {
-                if self.queue.tail.remove_reader(&self.reader, &self.queue.manager) {
-                    self.queue
-                        .manager
-                        .signal
-                        .set_reader(SeqCst);
+                if self
+                    .queue
+                    .tail
+                    .remove_reader(&self.reader, &self.queue.manager)
+                {
+                    self.queue.manager.signal.set_reader(SeqCst);
                 }
                 self.queue.manager.remove_token(self.token);
             }
@@ -607,7 +608,6 @@ impl<RW: QueueRW<T>, T> InnerRecv<RW, T> {
         }
     }
 }
-
 
 impl<RW: QueueRW<T>, T> FutInnerSend<RW, T> {
     /// Identical to InnerSend::try_send()
@@ -645,10 +645,10 @@ impl<RW: QueueRW<T>, T> FutInnerRecv<RW, T> {
 
     /// Attempts to transform this receiver into a FutInnerUniRecv
     /// calling the passed function on the input data.
-    pub fn into_single<R, F: FnMut(&T) -> R>
-        (self,
-         op: F)
-         -> Result<FutInnerUniRecv<RW, R, F, T>, (F, FutInnerRecv<RW, T>)> {
+    pub fn into_single<R, F: FnMut(&T) -> R>(
+        self,
+        op: F,
+    ) -> Result<FutInnerUniRecv<RW, R, F, T>, (F, FutInnerRecv<RW, T>)> {
         let new_mreader;
         let new_pwait = self.prod_wait.clone();
         let new_wait = self.wait.clone();
@@ -658,18 +658,20 @@ impl<RW: QueueRW<T>, T> FutInnerRecv<RW, T> {
         }
         if new_mreader.is_single() {
             Ok(FutInnerUniRecv {
-                   reader: new_mreader,
-                   wait: new_wait,
-                   prod_wait: new_pwait,
-                   op: op,
-               })
+                reader: new_mreader,
+                wait: new_wait,
+                prod_wait: new_pwait,
+                op: op,
+            })
         } else {
-            Err((op,
-                 FutInnerRecv {
-                     reader: new_mreader,
-                     wait: new_wait,
-                     prod_wait: new_pwait,
-                 }))
+            Err((
+                op,
+                FutInnerRecv {
+                    reader: new_mreader,
+                    wait: new_wait,
+                    prod_wait: new_pwait,
+                },
+            ))
         }
     }
 
@@ -737,15 +739,14 @@ impl<RW: QueueRW<T>, T> Sink for FutInnerSend<RW, T> {
 
     /// Essentially try_send except parks if the queue is full
     fn start_send(&mut self, msg: T) -> StartSend<T, SendError<T>> {
-
-        match self.prod_wait.send_or_park(|m| self.writer.try_send(m), msg) {
+        match self
+            .prod_wait
+            .send_or_park(|m| self.writer.try_send(m), msg)
+        {
             Ok(_) => {
                 // see InnerSend::try_recv for why this isn't in the queue
                 if self.writer.queue.needs_notify {
-                    self.writer
-                        .queue
-                        .waiter
-                        .notify();
+                    self.writer.queue.waiter.notify();
                 }
                 Ok(AsyncSink::Ready)
             }
@@ -812,7 +813,6 @@ impl<RW: QueueRW<T>, R, F: for<'r> FnMut(&T) -> R, T> Stream for FutInnerUniRecv
     }
 }
 
-
 //////// FutWait
 
 impl FutWait {
@@ -857,10 +857,11 @@ impl FutWait {
         return true;
     }
 
-    fn send_or_park<T, F: Fn(T) -> Result<(), TrySendError<T>>>(&self,
-                                                                f: F,
-                                                                mut val: T)
-                                                                -> Result<(), TrySendError<T>> {
+    fn send_or_park<T, F: Fn(T) -> Result<(), TrySendError<T>>>(
+        &self,
+        f: F,
+        mut val: T,
+    ) -> Result<(), TrySendError<T>> {
         for _ in 0..self.spins_first {
             match f(val) {
                 Err(TrySendError::Full(v)) => val = v,
@@ -1008,8 +1009,8 @@ impl<RW: QueueRW<T>, T> Drop for MultiQueue<RW, T> {
                 }
             }
         } else {
-            let last_read = CountedIndex::from_usize(self.tail.last_pos.get(),
-                                                     self.capacity as Index);
+            let last_read =
+                CountedIndex::from_usize(self.tail.last_pos.get(), self.capacity as Index);
             while last_read.load_count(Relaxed) != self.head.load_count(Relaxed) {
                 unsafe {
                     let cur_pos = last_read.load_transaction(Relaxed);
@@ -1025,28 +1026,40 @@ impl<RW: QueueRW<T>, T> Drop for MultiQueue<RW, T> {
 impl<RW: QueueRW<T>, T> Drop for FutInnerRecv<RW, T> {
     fn drop(&mut self) {
         let prod_wait = self.prod_wait.clone();
-        unsafe { self.reader.do_unsubscribe_with(|| { prod_wait.notify(); }) }
+        unsafe {
+            self.reader.do_unsubscribe_with(|| {
+                prod_wait.notify();
+            })
+        }
     }
 }
 
 impl<RW: QueueRW<T>, R, F: for<'r> FnMut(&T) -> R, T> Drop for FutInnerUniRecv<RW, R, F, T> {
     fn drop(&mut self) {
         let prod_wait = self.prod_wait.clone();
-        unsafe { self.reader.do_unsubscribe_with(|| { prod_wait.notify(); }) }
+        unsafe {
+            self.reader.do_unsubscribe_with(|| {
+                prod_wait.notify();
+            })
+        }
     }
 }
 
 impl<RW: QueueRW<T>, T> fmt::Debug for InnerRecv<RW, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,
-               "MultiQueue error message - you probably tried to unwrap the result of into_single")
+        write!(
+            f,
+            "MultiQueue error message - you probably tried to unwrap the result of into_single"
+        )
     }
 }
 
 impl<RW: QueueRW<T>, T> fmt::Debug for FutInnerRecv<RW, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,
-               "MultiQueue error message - you probably tried to unwrap the result of into_single")
+        write!(
+            f,
+            "MultiQueue error message - you probably tried to unwrap the result of into_single"
+        )
     }
 }
 
@@ -1058,8 +1071,9 @@ unsafe impl<RW: QueueRW<T>, T> Send for FutInnerSend<RW, T> {}
 unsafe impl<RW: QueueRW<T>, T> Send for FutInnerRecv<RW, T> {}
 unsafe impl<RW: QueueRW<T>, R, F: FnMut(&T) -> R, T> Send for FutInnerUniRecv<RW, R, F, T> {}
 
-pub fn futures_multiqueue<RW: QueueRW<T>, T>(capacity: Index)
-                                             -> (FutInnerSend<RW, T>, FutInnerRecv<RW, T>) {
+pub fn futures_multiqueue<RW: QueueRW<T>, T>(
+    capacity: Index,
+) -> (FutInnerSend<RW, T>, FutInnerRecv<RW, T>) {
     let cons_arc = Arc::new(FutWait::new());
     let prod_arc = Arc::new(FutWait::new());
     let (tx, rx) = MultiQueue::new_internal(capacity, cons_arc.clone());
