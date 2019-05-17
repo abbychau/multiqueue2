@@ -1,7 +1,7 @@
 [package]
 name = "multiqueue2"
 version = "0.1.1"
-authors = ["Sam Schetterer <samschet@gmail.com>, Abby <i@abby.md>"]
+authors = ["Sam Schetterer <samschet@gmail.com>", "Abby <i@abby.md>"]
 license = "MIT"
 description = "A fast mpmc broadcast queue"
 repository = "https://github.com/abbychau/multiqueue"
