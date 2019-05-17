@@ -2,7 +2,7 @@ extern crate crossbeam;
 extern crate multiqueue2 as multiqueue;
 extern crate time;
 
-use multiqueue::{broadcast_queue_with, wait, BroadcastReceiver, BroadcastSender};
+use crate::multiqueue::{broadcast_queue_with, wait, BroadcastReceiver, BroadcastSender};
 
 use time::precise_time_ns;
 

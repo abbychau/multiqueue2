@@ -10,13 +10,13 @@ use std::sync::mpsc::{RecvError, SendError, TryRecvError, TrySendError};
 use std::sync::Arc;
 use std::thread::yield_now;
 
-use alloc;
-use atomicsignal::LoadedSignal;
-use countedindex::{get_valid_wrap, is_tagged, rm_tag, CountedIndex, Index, INITIAL_QUEUE_FLAG};
-use memory::{MemToken, MemoryManager};
-use wait::*;
+use crate::alloc;
+use crate::atomicsignal::LoadedSignal;
+use crate::countedindex::{get_valid_wrap, is_tagged, rm_tag, CountedIndex, Index, INITIAL_QUEUE_FLAG};
+use crate::memory::{MemToken, MemoryManager};
+use crate::wait::*;
 
-use read_cursor::{ReadCursor, Reader};
+use crate::read_cursor::{ReadCursor, Reader};
 
 extern crate atomic_utilities;
 extern crate futures;
@@ -31,13 +31,13 @@ use self::atomic_utilities::artificial_dep::{dependently_mut, DepOrd};
 /// This is basically acting as a static bool
 /// so the queue can act as a normal mpmc in other circumstances
 pub trait QueueRW<T> {
-    fn inc_ref(&AtomicUsize);
-    fn dec_ref(&AtomicUsize);
-    fn check_ref(&AtomicUsize) -> bool;
+    fn inc_ref(_: &AtomicUsize);
+    fn dec_ref(_: &AtomicUsize);
+    fn check_ref(_: &AtomicUsize) -> bool;
     fn do_drop() -> bool;
-    unsafe fn get_val(&mut T) -> T;
-    fn forget_val(T);
-    unsafe fn drop_in_place(&mut T);
+    unsafe fn get_val(_: &mut T) -> T;
+    fn forget_val(_: T);
+    unsafe fn drop_in_place(_: &mut T);
 }
 
 #[derive(Clone)]
@@ -221,8 +221,8 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
 
     fn new_internal(_capacity: Index, wait: Arc<Wait>) -> (InnerSend<RW, T>, InnerRecv<RW, T>) {
         let capacity = get_valid_wrap(_capacity);
-        let queuedat = alloc::allocate(capacity as usize);
-        let refdat = alloc::allocate(capacity as usize);
+        let queuedat : *mut QueueEntry<T> = alloc::allocate(capacity as usize);
+        let refdat : *mut RefCnt = alloc::allocate(capacity as usize);
         unsafe {
             for i in 0..capacity as isize {
                 let elem: &QueueEntry<T> = &*queuedat.offset(i);

@@ -1,9 +1,9 @@
-use countedindex::Index;
-use multiqueue::{
+use crate::countedindex::Index;
+use crate::multiqueue::{
     futures_multiqueue, FutInnerRecv, FutInnerSend, FutInnerUniRecv, InnerRecv, InnerSend,
     MultiQueue, MPMC,
 };
-use wait::Wait;
+use crate::wait::Wait;
 
 use std::sync::mpsc::{RecvError, SendError, TryRecvError, TrySendError};
 

@@ -3,9 +3,9 @@ use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
-use alloc;
-use atomicsignal::AtomicSignal;
-use maybe_acquire::{maybe_acquire_fence, MAYBE_ACQUIRE};
+use crate::alloc;
+use crate::atomicsignal::AtomicSignal;
+use crate::maybe_acquire::{maybe_acquire_fence, MAYBE_ACQUIRE};
 
 struct ToFree {
     mem: *mut u8,

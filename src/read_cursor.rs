@@ -2,11 +2,11 @@ use std::cell::Cell;
 use std::ptr;
 use std::sync::atomic::{fence, AtomicPtr, AtomicUsize, Ordering};
 
-use alloc;
-use consume::CONSUME;
-use countedindex::{past, CountedIndex, Index, Transaction};
-use maybe_acquire::{maybe_acquire_fence, MAYBE_ACQUIRE};
-use memory::MemoryManager;
+use crate::alloc;
+use crate::consume::CONSUME;
+use crate::countedindex::{past, CountedIndex, Index, Transaction};
+use crate::maybe_acquire::{maybe_acquire_fence, MAYBE_ACQUIRE};
+use crate::memory::MemoryManager;
 
 #[derive(Clone, Copy, PartialEq)]
 enum ReaderState {

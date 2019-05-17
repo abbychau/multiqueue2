@@ -315,13 +315,13 @@ mod multiqueue;
 mod read_cursor;
 pub mod wait;
 
-pub use broadcast::{
+pub use crate::broadcast::{
     broadcast_fut_queue, broadcast_queue, broadcast_queue_with, BroadcastFutReceiver,
     BroadcastFutSender, BroadcastFutUniReceiver, BroadcastReceiver, BroadcastSender,
     BroadcastUniReceiver,
 };
 
-pub use mpmc::{
+pub use crate::mpmc::{
     mpmc_fut_queue, mpmc_queue, mpmc_queue_with, MPMCFutReceiver, MPMCFutSender,
     MPMCFutUniReceiver, MPMCReceiver, MPMCSender, MPMCUniReceiver,
 };

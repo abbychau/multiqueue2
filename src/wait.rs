@@ -16,7 +16,7 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::thread::yield_now;
 
-use countedindex::{past, rm_tag};
+use crate::countedindex::{past, rm_tag};
 extern crate parking_lot;
 
 pub const DEFAULT_YIELD_SPINS: usize = 50;
@@ -47,7 +47,7 @@ pub trait Wait {
     /// Causes the reader to block until the queue is available. Is passed
     /// the queue tag which the readers are waiting on, a reference to the
     /// corresponding AtomicUsize, and a reference to the number of writers
-    fn wait(&self, usize, &AtomicUsize, &AtomicUsize);
+    fn wait(&self, _: usize, _: &AtomicUsize, _: &AtomicUsize);
 
     /// Called by writers to awaken waiting readers
     fn notify(&self);
@@ -226,7 +226,7 @@ mod test {
     use std::thread::yield_now;
 
     use super::*;
-    use broadcast::broadcast_queue_with;
+    use crate::broadcast::broadcast_queue_with;
 
     extern crate crossbeam;
     use self::crossbeam::scope;
