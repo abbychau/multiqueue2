@@ -1,5 +1,5 @@
 extern crate crossbeam;
-extern crate multiqueue;
+extern crate multiqueue2 as multiqueue;
 
 use self::crossbeam::scope;
 use self::multiqueue::broadcast_queue;

@@ -34,7 +34,7 @@ pub struct MemoryManager {
 impl ToFree {
     pub fn new<T>(val: *mut T, num: usize) -> ToFree {
         unsafe fn do_free<F>(pt: *mut u8, num: usize) {
-            let to_free: *mut F = mem::transmute(pt);
+            let to_free: *mut F = mem::transmute(pt as *mut F);
             for i in 0..num as isize {
                 ptr::read(to_free.offset(i));
             }
@@ -80,7 +80,7 @@ impl MemoryManagerInner {
     }
 
     pub fn try_freeing(&mut self, at: usize) -> bool {
-        if self.tokens.len() == 0 {
+        if self.tokens.is_empty() {
             return false;
         }
         for token_ptr in &self.tokens {

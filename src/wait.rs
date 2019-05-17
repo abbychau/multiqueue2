@@ -58,17 +58,18 @@ pub trait Wait {
 }
 
 /// Thus spins in a loop on the queue waiting for a value to be ready
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub struct BusyWait {}
 
 /// This spins on the queue for a few iterations and then starts yielding intermittently
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub struct YieldingWait {
     spins_first: usize,
     spins_yield: usize,
 }
 
 /// This tries spinning on the queue for a short while, then yielding, and then blocks
+#[derive(Default)]
 pub struct BlockingWait {
     spins_first: usize,
     spins_yield: usize,

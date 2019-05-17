@@ -845,7 +845,7 @@ impl FutWait {
                 return false;
             }
         }
-        return true;
+        true
     }
 
     pub fn park(&self, seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
@@ -854,7 +854,7 @@ impl FutWait {
             return false;
         }
         parked.push_back(current());
-        return true;
+        true
     }
 
     fn send_or_park<T, F: Fn(T) -> Result<(), TrySendError<T>>>(
@@ -898,7 +898,7 @@ impl FutWait {
 impl Wait for FutWait {
     #[cold]
     fn wait(&self, _seq: usize, _w_pos: &AtomicUsize, _wc: &AtomicUsize) {
-        assert!(false, "Somehow normal wait got called in futures queue");
+        panic!("Somehow normal wait got called in futures queue");
     }
 
     fn notify(&self) {

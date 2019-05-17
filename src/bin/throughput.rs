@@ -1,5 +1,5 @@
 extern crate crossbeam;
-extern crate multiqueue;
+extern crate multiqueue2 as multiqueue;
 extern crate time;
 
 use multiqueue::{broadcast_queue_with, wait, BroadcastReceiver, BroadcastSender};
@@ -12,34 +12,27 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Barrier;
 
 #[inline(never)]
-fn recv(bar: &Barrier, mreader: BroadcastReceiver<u64>, sum: &AtomicUsize, check: bool) {
+fn recv(barrier: &Barrier, mreader: BroadcastReceiver<u64>, sum: &AtomicUsize, check: bool) {
     let reader = mreader.into_single().unwrap();
-    bar.wait();
+    barrier.wait();
     let start = precise_time_ns();
     let mut cur = 0;
-    loop {
-        match reader.recv() {
-            Ok(pushed) => {
-                if cur != pushed {
-                    if check {
-                        panic!("Got {}, expected {}", pushed, cur);
-                    }
-                }
-                cur += 1;
-            }
-            Err(_) => break,
+    while let Ok(pushed) = reader.recv() {
+        if cur != pushed && check {
+            panic!("Got {}, expected {}", pushed, cur);
         }
+        cur += 1;
     }
 
     sum.fetch_add((precise_time_ns() - start) as usize, Ordering::SeqCst);
 }
 
-fn send(bar: &Barrier, writer: BroadcastSender<u64>, num_push: usize) {
-    bar.wait();
+fn send(barrier: &Barrier, writer: BroadcastSender<u64>, num_push: usize) {
+    barrier.wait();
     for i in 0..num_push as u64 {
         loop {
             let topush = i;
-            if let Ok(_) = writer.try_send(topush) {
+            if writer.try_send(topush).is_ok() {
                 break;
             }
         }
@@ -47,10 +40,10 @@ fn send(bar: &Barrier, writer: BroadcastSender<u64>, num_push: usize) {
 }
 
 fn runit(name: &str, n_senders: usize, n_readers: usize) {
-    let num_do = 100000000;
+    let num_do = 100_000_000;
     let (writer, reader) = broadcast_queue_with(20000, wait::BusyWait::new());
-    let bar = Barrier::new(1 + n_senders + n_readers);
-    let bref = &bar;
+    let barrier = Barrier::new(1 + n_senders + n_readers);
+    let bref = &barrier;
     let ns_atomic = AtomicUsize::new(0);
     scope(|scope| {
         for _ in 0..n_senders {
@@ -69,7 +62,7 @@ fn runit(name: &str, n_senders: usize, n_readers: usize) {
             });
         }
         reader.unsubscribe();
-        bar.wait();
+        barrier.wait();
     });
     let ns_spent = (ns_atomic.load(Ordering::Relaxed) as f64) / n_readers as f64;
     let ns_per_item = ns_spent / (num_do as f64);

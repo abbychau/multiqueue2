@@ -1,6 +1,6 @@
 // For the most part, shamelessly copied from carllerche futures mpsc tests
 extern crate futures;
-extern crate multiqueue;
+extern crate multiqueue2 as multiqueue;
 
 use futures::future::lazy;
 use futures::{Async, Future, Sink, Stream};
