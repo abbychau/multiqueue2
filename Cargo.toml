@@ -1,6 +1,6 @@
 [package]
 name = "multiqueue"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Sam Schetterer <samschet@gmail.com>, Abby <i@abby.md>"]
 license = "MIT"
 description = "A fast mpmc broadcast queue"
