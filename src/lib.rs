@@ -100,7 +100,7 @@
 //! # Example: SPSC channel
 //!
 //! ```
-//! extern crate multiqueue;
+//! extern crate multiqueue2 as multiqueue;
 //!
 //! use std::thread;
 //!
@@ -131,7 +131,7 @@
 //! # Example: SPSC broadcasting
 //!
 //! ```
-//! extern crate multiqueue;
+//! extern crate multiqueue2 as multiqueue;
 //!
 //! use std::thread;
 //!
@@ -180,7 +180,7 @@
 //! # Example: SPMC broadcast
 //!
 //! ```
-//! extern crate multiqueue;
+//! extern crate multiqueue2 as multiqueue;
 //!
 //! use std::thread;
 //!
@@ -235,7 +235,7 @@
 //! # Example: Usage menagerie
 //!
 //! ```
-//! extern crate multiqueue;
+//! extern crate multiqueue2 as multiqueue;
 //!
 //! use std::thread;
 //!

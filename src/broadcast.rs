@@ -20,7 +20,7 @@ use self::futures::{Async, Poll, Sink, StartSend, Stream};
 /// ```
 /// use std::thread;
 ///
-/// let (send, recv) = multiqueue::broadcast_queue(4);
+/// let (send, recv) = multiqueue2::broadcast_queue(4);
 ///
 /// let mut handles = vec![];
 ///
@@ -80,7 +80,7 @@ pub struct BroadcastSender<T: Clone> {
 /// ```
 /// use std::thread;
 ///
-/// let (send, recv) = multiqueue::broadcast_queue(4);
+/// let (send, recv) = multiqueue2::broadcast_queue(4);
 ///
 /// let mut handles = vec![];
 ///
@@ -138,7 +138,7 @@ pub struct BroadcastReceiver<T: Clone> {
 /// # Example:
 ///
 /// ```
-/// use multiqueue::broadcast_queue;
+/// use multiqueue2::broadcast_queue;
 ///
 /// let (w, r) = broadcast_queue(10);
 /// w.try_send(1).unwrap();
@@ -196,14 +196,14 @@ impl<T: Clone> BroadcastReceiver<T> {
     /// # Examples:
     ///
     /// ```
-    /// use multiqueue::broadcast_queue;
+    /// use multiqueue2::broadcast_queue;
     /// let (w, r) = broadcast_queue(10);
     /// w.try_send(1).unwrap();
     /// assert_eq!(1, r.try_recv().unwrap());
     /// ```
     ///
     /// ```
-    /// use multiqueue::broadcast_queue;
+    /// use multiqueue2::broadcast_queue;
     /// use std::thread;
     ///
     /// let (send, recv) = broadcast_queue(10);
@@ -242,14 +242,14 @@ impl<T: Clone> BroadcastReceiver<T> {
     /// # Examples:
     ///
     /// ```
-    /// use multiqueue::broadcast_queue;
+    /// use multiqueue2::broadcast_queue;
     /// let (w, r) = broadcast_queue(10);
     /// w.try_send(1).unwrap();
     /// assert_eq!(1, r.recv().unwrap());
     /// ```
     ///
     /// ```
-    /// use multiqueue::broadcast_queue;
+    /// use multiqueue2::broadcast_queue;
     /// use std::thread;
     ///
     /// let (send, recv) = broadcast_queue(10);
@@ -283,7 +283,7 @@ impl<T: Clone> BroadcastReceiver<T> {
     /// # Examples
     ///
     /// ```
-    /// use multiqueue::broadcast_queue;
+    /// use multiqueue2::broadcast_queue;
     /// let (w, r) = broadcast_queue(10);
     /// w.try_send(1).unwrap();
     /// assert_eq!(r.recv().unwrap(), 1);
@@ -296,7 +296,7 @@ impl<T: Clone> BroadcastReceiver<T> {
     /// ```
     ///
     /// ```
-    /// use multiqueue::broadcast_queue;
+    /// use multiqueue2::broadcast_queue;
     ///
     /// use std::thread;
     ///
@@ -345,7 +345,7 @@ impl<T: Clone> BroadcastReceiver<T> {
     /// # Examples
     ///
     /// ```
-    /// use multiqueue::broadcast_queue;
+    /// use multiqueue2::broadcast_queue;
     /// let (writer, reader) = broadcast_queue(1);
     /// let reader_2_1 = reader.add_stream();
     /// let reader_2_2 = reader_2_1.clone();
@@ -368,7 +368,7 @@ impl<T: Clone> BroadcastReceiver<T> {
     /// # Examples:
     ///
     /// ```
-    /// use multiqueue::broadcast_queue;
+    /// use multiqueue2::broadcast_queue;
     /// let (w, r) = broadcast_queue(2);
     /// for _ in 0 .. 3 {
     ///     w.try_send(1).unwrap();
@@ -390,7 +390,7 @@ impl<T: Clone + Sync> BroadcastReceiver<T> {
     /// # Example:
     ///
     /// ```
-    /// use multiqueue::broadcast_queue;
+    /// use multiqueue2::broadcast_queue;
     ///
     /// let (w, r) = broadcast_queue(10);
     /// w.try_send(1).unwrap();
@@ -434,7 +434,7 @@ impl<T: Clone + Sync> BroadcastUniReceiver<T> {
     ///
     /// # Example
     /// ```
-    /// use multiqueue::broadcast_queue;
+    /// use multiqueue2::broadcast_queue;
     ///
     /// let (w, r) = broadcast_queue(10);
     /// let single_r = r.into_single().unwrap();
@@ -464,7 +464,7 @@ impl<T: Clone + Sync> BroadcastUniReceiver<T> {
     ///
     /// # Example
     /// ```
-    /// use multiqueue::broadcast_queue;
+    /// use multiqueue2::broadcast_queue;
     ///
     /// let (w, r) = broadcast_queue(10);
     /// let single_r = r.into_single().unwrap();
@@ -499,7 +499,7 @@ impl<T: Clone + Sync> BroadcastUniReceiver<T> {
     /// # Example
     ///
     /// ```
-    /// use multiqueue::broadcast_queue;
+    /// use multiqueue2::broadcast_queue;
     ///
     /// let (w, r) = broadcast_queue(10);
     /// w.try_send(1).unwrap();
@@ -520,7 +520,7 @@ impl<T: Clone + Sync> BroadcastUniReceiver<T> {
     /// # Examples:
     ///
     /// ```
-    /// use multiqueue::broadcast_queue;
+    /// use multiqueue2::broadcast_queue;
     /// let (w, r) = broadcast_queue(2);
     /// let sr = r.into_single().unwrap();
     /// w.try_send(1).unwrap();
@@ -541,7 +541,7 @@ impl<T: Clone + Sync> BroadcastUniReceiver<T> {
     /// # Examples:
     ///
     /// ```
-    /// use multiqueue::broadcast_queue;
+    /// use multiqueue2::broadcast_queue;
     /// let (w, r) = broadcast_queue(2);
     /// let sr = r.into_single().unwrap();
     /// for _ in 0 .. 3 {
@@ -841,7 +841,7 @@ impl<'a, R, F: FnMut(&T) -> R, T: Clone + Sync + 'a> Iterator for BroadcastUniRe
 ///
 /// # Example
 /// ```
-/// use multiqueue::broadcast_queue;
+/// use multiqueue2::broadcast_queue;
 /// let (w, r) = broadcast_queue(10);
 /// w.try_send(10).unwrap();
 /// assert_eq!(10, r.try_recv().unwrap());
@@ -859,8 +859,8 @@ pub fn broadcast_queue<T: Clone>(capacity: Index) -> (BroadcastSender<T>, Broadc
 ///
 /// # Example
 /// ```
-/// use multiqueue::broadcast_queue_with;
-/// use multiqueue::wait::BusyWait;
+/// use multiqueue2::broadcast_queue_with;
+/// use multiqueue2::wait::BusyWait;
 /// let (w, r) = broadcast_queue_with(10, BusyWait::new());
 /// w.try_send(10).unwrap();
 /// assert_eq!(10, r.try_recv().unwrap());

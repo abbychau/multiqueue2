@@ -103,7 +103,7 @@ Since those drawings probably made no sense, here are some examples
 
 This is about as simple as it gets for a queue. Fast, one writer, one reader, simple to use.
 ```rust
-extern crate multiqueue;
+extern crate multiqueue2 as multiqueue;
 
 use std::thread;
 
@@ -136,7 +136,7 @@ drop(send);
 
 Let's send the values to two different streams
 ```rust
-extern crate multiqueue;
+extern crate multiqueue2 as multiqueue;
 
 use std::thread;
 
@@ -182,7 +182,7 @@ drop(send);
 ### Single-producer broadcast, 2 consumers per stream
 Let's take the above and make each stream consumed by two consumers
 ```rust
-extern crate multiqueue;
+extern crate multiqueue2 as multiqueue;
 
 use std::thread;
 
@@ -232,7 +232,7 @@ drop(send);
 Has anyone really been far even as decided to use even go want to do look more like?
 
 ```rust
-extern crate multiqueue;
+extern crate multiqueue2 as multiqueue;
 
 use std::thread;
 

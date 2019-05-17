@@ -6,8 +6,8 @@
 //! # Examples
 //!
 //! ```
-//! use multiqueue::wait::*;
-//! use multiqueue::broadcast_queue_with;
+//! use multiqueue2::wait::*;
+//! use multiqueue2::broadcast_queue_with;
 //! let _ = broadcast_queue_with::<usize, BusyWait>(10, BusyWait::new());
 //! let _ = broadcast_queue_with::<usize, YieldingWait>(10, YieldingWait::new());
 //! let _ = broadcast_queue_with::<usize, BlockingWait>(10, BlockingWait::new());
