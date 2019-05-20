@@ -401,7 +401,7 @@ impl<T> MPMCUniReceiver<T> {
     /// }
     /// ```
     pub fn iter_with<R, F: FnMut(&T) -> R>(self, op: F) -> MPMCUniIter<R, F, T> {
-        MPMCUniIter { recv: self, op: op }
+        MPMCUniIter { recv: self, op }
     }
 
     /// Returns a non-owning iterator that iterates over the queue
@@ -423,7 +423,7 @@ impl<T> MPMCUniReceiver<T> {
     /// }
     /// ```
     pub fn try_iter_with<'a, R, F: FnMut(&T) -> R>(&'a self, op: F) -> MPMCUniRefIter<'a, R, F, T> {
-        MPMCUniRefIter { recv: self, op: op }
+        MPMCUniRefIter { recv: self, op }
     }
 }
 
@@ -469,7 +469,7 @@ impl<T> MPMCFutReceiver<T> {
             Ok(sreceiver) => Ok(MPMCFutUniReceiver {
                 receiver: sreceiver,
             }),
-            Err((o, receiver)) => Err((o, MPMCFutReceiver { receiver: receiver })),
+            Err((o, receiver)) => Err((o, MPMCFutReceiver { receiver })),
         }
     }
 }

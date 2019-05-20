@@ -12,7 +12,9 @@ use std::thread::yield_now;
 
 use crate::alloc;
 use crate::atomicsignal::LoadedSignal;
-use crate::countedindex::{get_valid_wrap, is_tagged, rm_tag, CountedIndex, Index, INITIAL_QUEUE_FLAG};
+use crate::countedindex::{
+    get_valid_wrap, is_tagged, rm_tag, CountedIndex, Index, INITIAL_QUEUE_FLAG,
+};
 use crate::memory::{MemToken, MemoryManager};
 use crate::wait::*;
 
@@ -202,7 +204,7 @@ pub struct FutInnerUniRecv<RW: QueueRW<T>, R, F: FnMut(&T) -> R, T> {
 }
 
 struct FutWait {
-    spins_first: usize,
+    // spins_first: usize,
     spins_yield: usize,
     parked: parking_lot::Mutex<VecDeque<Task>>,
 }
@@ -221,8 +223,8 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
 
     fn new_internal(_capacity: Index, wait: Arc<Wait>) -> (InnerSend<RW, T>, InnerRecv<RW, T>) {
         let capacity = get_valid_wrap(_capacity);
-        let queuedat : *mut QueueEntry<T> = alloc::allocate(capacity as usize);
-        let refdat : *mut RefCnt = alloc::allocate(capacity as usize);
+        let queuedat: *mut QueueEntry<T> = alloc::allocate(capacity as usize);
+        let refdat: *mut RefCnt = alloc::allocate(capacity as usize);
         unsafe {
             for i in 0..capacity as isize {
                 let elem: &QueueEntry<T> = &*queuedat.offset(i);
@@ -248,7 +250,7 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
             refs: refdat,
             capacity: capacity as isize,
             waiter: wait,
-            needs_notify: needs_notify,
+            needs_notify,
             mk: PhantomData,
             d3: unsafe { mem::uninitialized() },
 
@@ -267,7 +269,7 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
 
         let mreader = InnerRecv {
             queue: qarc.clone(),
-            reader: reader,
+            reader,
             token: qarc.manager.get_token(),
             alive: true,
         };
@@ -659,7 +661,7 @@ impl<RW: QueueRW<T>, T> FutInnerRecv<RW, T> {
                 reader: new_mreader,
                 wait: new_wait,
                 prod_wait: new_pwait,
-                op: op,
+                op,
             })
         } else {
             Err((
@@ -710,7 +712,7 @@ impl<RW: QueueRW<T>, R, F: FnMut(&T) -> R, T> FutInnerUniRecv<RW, R, F, T> {
             reader: rx,
             wait: self.wait.clone(),
             prod_wait: self.prod_wait.clone(),
-            op: op,
+            op,
         }
     }
 
@@ -815,36 +817,43 @@ impl<RW: QueueRW<T>, R, F: for<'r> FnMut(&T) -> R, T> Stream for FutInnerUniRecv
 
 impl FutWait {
     pub fn new() -> FutWait {
-        FutWait::with_spins(DEFAULT_TRY_SPINS, DEFAULT_YIELD_SPINS)
-    }
-
-    pub fn with_spins(spins_first: usize, spins_yield: usize) -> FutWait {
+        //FutWait::with_spins(DEFAULT_TRY_SPINS, DEFAULT_YIELD_SPINS)
         FutWait {
-            spins_first: spins_first,
-            spins_yield,
+            // spins_first: spins_first,
+            spins_yield: DEFAULT_YIELD_SPINS,
             parked: parking_lot::Mutex::new(VecDeque::new()),
         }
     }
 
+    // pub fn with_spins(spins_first: usize, spins_yield: usize) -> FutWait {
+    //     FutWait {
+    //         // spins_first: spins_first,
+    //         // spins_yield,
+    //         parked: parking_lot::Mutex::new(VecDeque::new()),
+    //     }
+    // }
+
     pub fn fut_wait(&self, seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
-        self.spin(seq, at, wc) && self.park(seq, at, wc)
+        //self.spin(seq, at, wc) &&
+        self.park(seq, at, wc)
     }
 
-    pub fn spin(&self, seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
-        for _ in 0..self.spins_first {
-            if check(seq, at, wc) {
-                return false;
-            }
-        }
+    // #[allow(dead_code)]
+    // pub fn spin(&self, seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
+    //     for _ in 0..self.spins_first {
+    //         if check(seq, at, wc) {
+    //             return false;
+    //         }
+    //     }
 
-        for _ in 0..self.spins_yield {
-            yield_now();
-            if check(seq, at, wc) {
-                return false;
-            }
-        }
-        true
-    }
+    //     for _ in 0..self.spins_yield {
+    //         yield_now();
+    //         if check(seq, at, wc) {
+    //             return false;
+    //         }
+    //     }
+    //     true
+    // }
 
     pub fn park(&self, seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
         let mut parked = self.parked.lock();
@@ -860,12 +869,12 @@ impl FutWait {
         f: F,
         mut val: T,
     ) -> Result<(), TrySendError<T>> {
-        for _ in 0..self.spins_first {
-            match f(val) {
-                Err(TrySendError::Full(v)) => val = v,
-                v => return v,
-            }
-        }
+        // for _ in 0..self.spins_first {
+        //     match f(val) {
+        //         Err(TrySendError::Full(v)) => val = v,
+        //         v => return v,
+        //     }
+        // }
 
         for _ in 0..self.spins_yield {
             yield_now();
@@ -971,7 +980,7 @@ impl<RW: QueueRW<T>, T> Clone for FutInnerRecv<RW, T> {
 
 impl Clone for FutWait {
     fn clone(&self) -> FutWait {
-        FutWait::with_spins(self.spins_first, self.spins_yield)
+        FutWait::new()
     }
 }
 

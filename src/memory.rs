@@ -34,7 +34,7 @@ pub struct MemoryManager {
 impl ToFree {
     pub fn new<T>(val: *mut T, num: usize) -> ToFree {
         unsafe fn do_free<F>(pt: *mut u8, num: usize) {
-            let to_free: *mut F = mem::transmute(pt as *mut F);
+            let to_free: *mut F = pt as *mut F;
             for i in 0..num as isize {
                 ptr::read(to_free.offset(i));
             }

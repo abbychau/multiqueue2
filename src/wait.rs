@@ -31,14 +31,15 @@ pub fn load_tagless(val: &AtomicUsize) -> usize {
 #[inline(always)]
 pub fn check(seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
     let cur_count = load_tagless(at);
+    wc.load(Relaxed) == 0 || seq == cur_count || past(seq, cur_count).1
 
-    if wc.load(Relaxed) == 0 || seq == cur_count || past(seq, cur_count).1 {
-        true
-    } else {
-        use std::{thread, time};
-        thread::sleep(time::Duration::from_millis(DEFAULT_CHECK_DELAY));
-        false
-    }
+    // if wc.load(Relaxed) == 0 || seq == cur_count || past(seq, cur_count).1 {
+    //     true
+    // } else {
+    //     use std::{thread, time};
+    //     thread::sleep(time::Duration::from_millis(DEFAULT_CHECK_DELAY));
+    //     false
+    // }
 }
 
 /// This is the trait that something implements to allow receivers

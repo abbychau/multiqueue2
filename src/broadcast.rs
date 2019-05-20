@@ -607,7 +607,7 @@ impl<T: Clone + Sync> BroadcastFutReceiver<T> {
             Ok(sreceiver) => Ok(BroadcastFutUniReceiver {
                 receiver: sreceiver,
             }),
-            Err((o, receiver)) => Err((o, BroadcastFutReceiver { receiver: receiver })),
+            Err((o, receiver)) => Err((o, BroadcastFutReceiver { receiver })),
         }
     }
 }
