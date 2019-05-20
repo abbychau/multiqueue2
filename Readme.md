@@ -2,9 +2,10 @@
 
 MultiQueue2 is a fast bounded mpmc queue that supports broadcast/broadcast style operations [![Build Status](https://travis-ci.org/schets/multiqueue.svg?branch=master)](https://travis-ci.org/abbychau/multiqueue)
 
-[MultiQueue](https://github.com/schets/multiqueue) is a mpmc library developed by Sam Schetterer, but not updated for some time. I found it very useful as it implements `futures`. However, it is with a few outdated library API and the use of spin locks is taking 100% CPU in many cases. This version tries to fix these.
+[MultiQueue](https://github.com/schets/multiqueue) is a mpmc library developed by Sam Schetterer, but not updated for some time. I found it very useful as it implements `futures`. However, it is with a few outdated library API and the use of spin locks is taking 100% CPU in many cases. This version tries to fix these. By default, it is now using a condvar block. For `_fut_` async channels, all items are parked quickly without initial spin locks.
 
-All warnings are fixed and upgraded to 2018 as well.
+All dependencies are upgraded and all warnings are fixed and upgraded to 2018 as well. (upto 20th May, 2019)
+
 
 TOC: [Overview](#over) | [Queue Model](#model) | [Examples](#examples) | [MPMC Mode](#mpmc) | [Futures Mode](#futures) | [Benchmarks](#bench) | [FAQ](#faq) | [Footnotes](#footnotes)
 
