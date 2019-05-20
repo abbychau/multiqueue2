@@ -246,7 +246,7 @@ mod test {
         scope(|scope| {
             for q in 0..senders {
                 let cur_writer = writer.clone();
-                scope.spawn(move || {
+                scope.spawn(move |_| {
                     let v = AtomicUsize::new(0);
                     'outer: for i in 0..num_loop {
                         for _ in 0..100000000 {
@@ -263,7 +263,7 @@ mod test {
             writer.unsubscribe();
             for _ in 0..receivers {
                 let this_reader = reader.add_stream().into_single().unwrap();
-                scope.spawn(move || {
+                scope.spawn(move |_| {
                     let mut myv = Vec::new();
                     for _ in 0..senders {
                         myv.push(0);
@@ -285,7 +285,7 @@ mod test {
                 });
             }
             reader.unsubscribe();
-        });
+        }).unwrap();
     }
 
     fn test_waiter<T: Wait + Clone + 'static>(waiter: T) {

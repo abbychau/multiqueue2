@@ -927,7 +927,7 @@ mod test {
         scope(|scope| {
             for q in 0..senders {
                 let cur_writer = writer.clone();
-                scope.spawn(move || {
+                scope.spawn(move |_| {
                     bref.wait();
                     'outer: for i in 0..num_loop {
                         for _ in 0..100000000 {
@@ -943,7 +943,7 @@ mod test {
             writer.unsubscribe();
             for _ in 0..receivers {
                 let this_reader = reader.add_stream().into_single().unwrap();
-                scope.spawn(move || {
+                scope.spawn(move |_| {
                     let mut myv = Vec::new();
                     for _ in 0..senders {
                         myv.push(0);
@@ -968,7 +968,7 @@ mod test {
                 });
             }
             reader.unsubscribe();
-        });
+        }).unwrap();
     }
 
     #[test]
@@ -1022,7 +1022,7 @@ mod test {
         scope(|scope| {
             for _ in 0..senders {
                 let cur_writer = writer.clone();
-                scope.spawn(move || {
+                scope.spawn(move |_| {
                     bref.wait();
                     'outer: for i in 0..num_loop {
                         for _ in 0..100000000 {
@@ -1043,7 +1043,7 @@ mod test {
                 let _this_reader = reader.add_stream();
                 for _ in 0..nclone {
                     let this_reader = _this_reader.clone();
-                    scope.spawn(move || {
+                    scope.spawn(move |_| {
                         let mut cur = 0;
                         bref.wait();
                         loop {
@@ -1067,7 +1067,7 @@ mod test {
                 }
             }
             reader.unsubscribe();
-        });
+        }).unwrap();
         assert_eq!(
             senders * receivers * num_loop,
             counter.load(Ordering::SeqCst)

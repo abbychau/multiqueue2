@@ -48,7 +48,7 @@ fn runit(name: &str, n_senders: usize, n_readers: usize) {
     scope(|scope| {
         for _ in 0..n_senders {
             let w = writer.clone();
-            scope.spawn(move || {
+            scope.spawn(move |_| {
                 send(bref, w, num_do);
             });
         }
@@ -57,13 +57,13 @@ fn runit(name: &str, n_senders: usize, n_readers: usize) {
             let aref = &ns_atomic;
             let r = reader.add_stream();
             let check = n_senders == 1;
-            scope.spawn(move || {
+            scope.spawn(move |_| {
                 recv(bref, r, aref, check);
             });
         }
         reader.unsubscribe();
         barrier.wait();
-    });
+    }).unwrap();
     let ns_spent = (ns_atomic.load(Ordering::Relaxed) as f64) / n_readers as f64;
     let ns_per_item = ns_spent / (num_do as f64);
     println!(

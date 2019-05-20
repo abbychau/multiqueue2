@@ -216,7 +216,7 @@ mod tests {
         let mycounted = CountedIndex::new(wrap_size);
         scope(|scope| {
             for _ in 0..nthread {
-                scope.spawn(|| {
+                scope.spawn(|_| {
                     for _ in 0..goaround {
                         for _ in 0..wrap_size {
                             let mut trans = mycounted.load_transaction(Relaxed);
@@ -230,7 +230,7 @@ mod tests {
                     }
                 });
             }
-        });
+        }).unwrap();
         assert_eq!(0, mycounted.load(Relaxed));
         assert_eq!(
             wrap_size as usize * goaround * nthread,
