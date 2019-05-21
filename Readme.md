@@ -1,10 +1,26 @@
 # MultiQueue2: Fast MPMC Broadcast Queue
 
-MultiQueue2 is a fast bounded mpmc queue that supports broadcast/broadcast style operations [![Build Status](https://travis-ci.org/schets/multiqueue.svg?branch=master)](https://travis-ci.org/abbychau/multiqueue)
+[![Build Status](https://travis-ci.org/abbychau/multiqueue2.svg?branch=master)](https://travis-ci.org/abbychau/multiqueue2)
 
-[MultiQueue](https://github.com/schets/multiqueue) is a mpmc library developed by Sam Schetterer, but not updated for some time. I found it very useful as it implements `futures`. However, it is with a few outdated library API and the use of spin locks is taking 100% CPU in many cases. This version tries to fix these. By default, it is now using a condvar block. For `_fut_` async channels, all items are parked quickly without initial spin locks.
 
-All dependencies are upgraded and all warnings are fixed and upgraded to 2018 as well. (upto 20th May, 2019)
+MultiQueue2 is a fast bounded mpmc queue that supports broadcast/broadcast style operations 
+
+[MultiQueue](https://github.com/schets/multiqueue) was developed by Sam Schetterer, but not updated for some time. I found it very useful as it implements `futures`. However, it is with a few outdated library API and the use of spin locks is taking 100% CPU in many cases. 
+
+## What's new in MultiQueue2
+
+This version tries to fix these. By default, it is now using a condvar block. For `_fut_` async channels, all items are parked quickly without initial spin locks.
+
+The use of this queue is virtually lockless but technically and strictly speaking not.
+There are three kind of locks:
+1. Spin with `std::thread::yield_now`
+2. Busy Spin
+3. Condvar blocking
+
+`2` is the fastest but it will take up 100% cpu. The default setting of MultiQueue2 including `_fut` channels are using Condvar blocks, this will pay about 20ns overhead. However, practically, it would not be the bottleneck of the application. One use case that could be better to change to `2` would be audio and video conversion.
+
+All dependencies are upgraded and all warnings are fixed and upgraded to 2018.
+
 
 
 TOC: [Overview](#over)| [Examples](#examples) | [MPMC Mode](#mpmc) | [Futures Mode](#futures) | [Benchmarks](#bench) | [FAQ](#faq) | [Footnotes](#footnotes)
@@ -23,16 +39,16 @@ One can think of MultiQueue as a sort of [souped up channel/sync_channel](#bench
 with the additional ability to have multiple independent consumers each receiving the same [stream](#model) of data.
 
 
-So why would you choose MultiQueue over the built-in channels?
+Reasons to choose MultiQueue2 over the built-in channels:
 
-MultiQueue
   * supports broadcasting elements to multiple readers with a single push into the queue
   * allows reading elements in-place in the queue in most cases, so you can broadcast elements without lots of copying
   * can act as a futures stream and sink
   * does not allocate on push/pop unlike channel, leading to much more predictable latencies
-  * is practically lockless<sup>[1](#ft1)</sup> unlike sync_channel, and fares decently under contention
+  * is virtually lockless unlike sync_channel, and fares decently under contention
 
-On the other hand, you would want to use a channel/sync_channel if you:
+Reasons NOT to choose MultiQueue2 over the built-in channels:
+
   * Truly want an unbounded queue, although you should probably handle backlog instead
   * Need senders to block when the queue is full and can't use the futures api
   * Don't want the memory usage of a large buffer
@@ -42,6 +58,7 @@ On the other hand, you would want to use a channel/sync_channel if you:
 Otherwise, in most cases, MultiQueue should be a good replacement for channels.
 In general, this will function very well as normal bounded queue with performance
 approaching that of hand-written queues for single/multiple consumers/producers
+
 **even without taking advantage of the broadcast**
 
 ## <a name = "examples">Examples</a>
@@ -323,9 +340,3 @@ On the other hand, this basically enforces a sort of system-wide backlog control
 an example why that's needed, NYSE occasionally does not keep the consolidated feed
 up to date with the individual feeds and markets fall into disarray.
 
-## <a name = "footnotes">Footnotes</a>
-
-<a name = "ft1">1</a>. The queue is technically not lockless - a writer which has claimed a write spot
-but then gotten stuck will block readers from progressing. There is a lockless MPMC bounded queue,
-but it requires a statically known max senders and I don't think can be extended to broadcast.
-In practice, it will rarely ever matter.
