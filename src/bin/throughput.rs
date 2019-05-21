@@ -41,7 +41,7 @@ fn send(barrier: &Barrier, writer: BroadcastSender<u64>, num_push: usize) {
 
 fn runit(name: &str, n_senders: usize, n_readers: usize) {
     let num_do = 100_000_000;
-    let (writer, reader) = broadcast_queue_with(20000, wait::BusyWait::new());
+    let (writer, reader) = broadcast_queue_with(20000, wait::BlockingWait::new());
     let barrier = Barrier::new(1 + n_senders + n_readers);
     let bref = &barrier;
     let ns_atomic = AtomicUsize::new(0);

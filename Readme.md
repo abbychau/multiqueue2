@@ -7,13 +7,13 @@ MultiQueue2 is a fast bounded mpmc queue that supports broadcast/broadcast style
 All dependencies are upgraded and all warnings are fixed and upgraded to 2018 as well. (upto 20th May, 2019)
 
 
-TOC: [Overview](#over) | [Queue Model](#model) | [Examples](#examples) | [MPMC Mode](#mpmc) | [Futures Mode](#futures) | [Benchmarks](#bench) | [FAQ](#faq) | [Footnotes](#footnotes)
+TOC: [Overview](#over)| [Examples](#examples) | [MPMC Mode](#mpmc) | [Futures Mode](#futures) | [Benchmarks](#bench) | [FAQ](#faq) | [Footnotes](#footnotes)
 
 ## <a name = "over">Overview</a>
 
 
 Multiqueue is based on the queue design from the LMAX Disruptor, with a few improvements:
-  * It can act as a futures stream/sink, so you can set up high-performance computing pipelines with ease
+  * futures stream/sink (implemented `futures` traits)
   * It can dynamically add/remove producers, and each [stream](#model) can have multiple consumers
   * It has fast fallbacks for whenever there's a single consumer and/or a single producer and can detect switches at runtime
   * It works on 32 bit systems without any performance or capability penalty
@@ -21,12 +21,16 @@ Multiqueue is based on the queue design from the LMAX Disruptor, with a few impr
 
 One can think of MultiQueue as a sort of [souped up channel/sync_channel](#bench),
 with the additional ability to have multiple independent consumers each receiving the same [stream](#model) of data.
+
+
 So why would you choose MultiQueue over the built-in channels?
-  * MultiQueue support broadcasting elements to multiple readers with a single push into the queue
-  * MultiQueue allows reading elements in-place in the queue in most cases, so you can broadcast elements without lots of copying
-  * MultiQueue can act as a futures stream and sink
-  * MultiQueue does not allocate on push/pop unlike channel, leading to much more predictable latencies
-  * Multiqueue is practically lockless<sup>[1](#ft1)</sup> unlike sync_channel, and fares decently under contention
+
+MultiQueue
+  * supports broadcasting elements to multiple readers with a single push into the queue
+  * allows reading elements in-place in the queue in most cases, so you can broadcast elements without lots of copying
+  * can act as a futures stream and sink
+  * does not allocate on push/pop unlike channel, leading to much more predictable latencies
+  * is practically lockless<sup>[1](#ft1)</sup> unlike sync_channel, and fares decently under contention
 
 On the other hand, you would want to use a channel/sync_channel if you:
   * Truly want an unbounded queue, although you should probably handle backlog instead
@@ -38,66 +42,7 @@ On the other hand, you would want to use a channel/sync_channel if you:
 Otherwise, in most cases, MultiQueue should be a good replacement for channels.
 In general, this will function very well as normal bounded queue with performance
 approaching that of hand-written queues for single/multiple consumers/producers
-even without taking advantage of the broadcast
-
-## <a name = "model">Queue Model</a>
-
-MultiQueue functions similarly to the LMAX Disruptor from a high level view.
-There's an incoming FIFO data stream that is broadcast to a set of subscribers
-as if there were multiple streams being written to.
-There are two main differences:
-  * MultiQueue transparently supports switching between single and multiple producers.
-  * Each broadcast stream can be shared among multiple consumers.
-
-The last part makes the model a bit confusing, since there's a difference between a stream of data
-and something consuming that stream. To make things worse, each consumer may not actually see each
-value on the stream. Instead, multiple consumers may act on a single stream each getting unique access
-to certain elements.
-
-A helpful mental model may be to think about this as if each stream was really just an mpmc
-queue that was getting pushed to, and the MultiQueue structure just assembled a bunch together behind the scenes.
-
-A diagram that represents a general use case of a broadcast queue where each consumer has unique access to a stream
-is below - the # stand in for producers and @ stands in for the consumer of each stream, each with a label.
-The lines are meant to show the data flow through the queue.
-
-```
--> #        @-1
-    \      /
-     -> -> -> @-2
-    /      \
--> #        @-3
-```
-This is a pretty standard broadcast queue setup -
-for each element sent in, it is seen on each stream by that's streams consumer.
-
-
-However, in MultiQueue, each logical consumer might actually be demultiplexed across many actual consumers, like below.
-```
--> #        @-1
-    \      /
-     -> -> -> @-2' (really @+@+@ each compete for a spot)
-    /      \
--> #        @-3
-```
-
-If this diagram is redrawn with each of the producers sending in a sequenced element (time goes left to right):
-
-
-```
-t=1|t=2|    t=3    | t=4|
-1 -> #              @-1 (1, 2)
-      \            /
-       -> 2 -> 1 -> -> @-2' (really @ (1) + @ (2) + @ (nothing yet))
-      /            \
-2 -> #              @-3 (1, 2)
-```
-
-If one imagines this as a webserver, the streams for @-1 and @-3 might be doing random webservery work like some logging
-or metrics gathering and can handle the workload completely on one core, @-2 is doing expensive work handling requests
-and is split into multiple workers dealing with the data stream.
-
-Since those drawings probably made no sense, here are some examples
+**even without taking advantage of the broadcast**
 
 ## <a name = "examples">Examples</a>
 
@@ -294,76 +239,52 @@ drop(send);
 ```
 
 ## <a name = "mpmc">MPMC Mode</a>
-One might notice that the broadcast queue modes requires that a type be Clone,
-and the single-reader inplace variants require that a type be Sync as well.
+One might notice that the broadcast queue modes requires that a type be `Clone`,
+and the single-reader inplace variants require that a type be `Sync` as well.
 This is only required for broadcast queues and not normal mpmc queues,
-so there's an mpmc api as well. It doesn't require that a type be Clone or Sync
-for any api, and also moves items directly out of the queue instead of cloning them.
+so there's an mpmc api as well. 
+
+Multiqueue2 doesn't require that a type be `Clone` or `Sync` for any api, 
+and also moves items directly out of the queue instead of cloning them.
 There's basically no api difference aside from that, so I'm not going to have a huge
 section on them.
 
 ## <a name = "futures">Futures Mode</a>
-For both mpmc and broadcast, a futures mode is supported. The datastructures are quite
-similar to the normal ones, except they implement the Futures Sink/Stream traits for
+For both mpmc and broadcast, a futures mode is supported. The data-structures are quite
+similar to the normal ones, except they implement the `Futures` `Sink`/`Stream` traits for
 senders and receivers. This comes at a bit of a performance cost, which is why the
-futures types are separate
+futures types are separated.
 
 
 ## <a name = "bench">Benchmarks</a>
 
 ### Throughput
 
-More are coming, but here are some basic throughput becnhmarks done on a Intel(R) Xeon(R) CPU E3-1240 v5.
-These were done using the busywait method to block, but using a blocking wait on receivers in practice will
-be more than fast enough for most use cases.
+The throughput is benchmarked using the condvar blocking locks, which is the default setting of the queue system. This ensures economical CPU usage even for long blocking async items.
 
+Switching to busy spinlock can provide another 30% throughput boost.
 
-Single Producer Single Consumer: 50-70 million ops per second. In this case, channels do ~8-11 million ops per second
-```
-# -> -> @
-```
-____
-Single Producer Single Consumer, broadcasted to two different streams: 28 million ops per second<sup>[2](#ft2)</sup>
-```
-         @
-        /
-# -> ->
-        \
-         @
-```
-____
-Single Producer Single Consumer, broadcasted to three different streams: 25 million ops per second<sup>[2](#ft2)</sup>
-```
-         @
-        /
-# -> -> -> @
-        \
-         @
-```
-____
-Multi Producer Single Consumer: 9 million ops per second. In this case, channels do ~8-9 million ops per second.
-```
-#
- \
-  -> -> @
- /
-#
-```
-____
-Multi Producer Single Consumer, broadcast to two different streams: 8 million ops per second
-```
-#        @
- \      /
-  -> ->
- /      \
-#        @
-```
-### Latency
+SPSC:
+`Time spent doing 10000000 push/pop pairs for 1p::1c was 292.9397618 ns per item`
 
-I need to rewrite the latency benchmark tool, but latencies will be approximately the
+SPMC:
+`Time spent doing 10000000 push/pop pairs for 1p::1c_2b was 310.12774815 ns per item`
+`Time spent doing 10000000 push/pop pairs for 1p::1c_3b was 317.77275306666667 ns per item`
+
+MPSC:
+`Time spent doing 10000000 push/pop pairs for 2p::1c was 378.5664167 ns per item`
+
+MPMC:
+`Time spent doing 10000000 push/pop pairs for 2p::1c_2b was 377.69721405 ns per item`
+`Time spent doing 10000000 push/pop pairs for 2p::1c_3b was 414.59893453333336 ns per item`
+
+On MacBook Pro 2018 i7, 16GB Ram.
+
+Here is no latency benchmark tool, but latencies will be approximately the
 inter core communication delay, about 40-70 ns on a single socket machine.
-These will be somewhat higher with multiple producers
-and multiple consumers since each one must perform an RMW before finishing a write or read.
+
+These will be higher with multiple producers and multiple consumers, 
+since each one must perform an RMW before finishing a write or read.
 
 ## <a name = "faq">FAQ</a>
 
@@ -371,12 +292,13 @@ and multiple consumers since each one must perform an RMW before finishing a wri
 You can use the MPMC portions of the queue, but you can't broadcast anything
 
 #### Why can't senders block even though readers can?
+
 It's sensible for a reader to block if there is truly nothing for it to do, while the equivalent
-isn't true for senders. If a sender blocks, that means that the system is backlogged and
-something should be done about it (like starting another worker that consumes from the backed up stream)!
-Furthermore, it puts more of a performance penalty on the queue than I really wanted and the latency
-hit for notifying senders comes before the queue action is finished, while notifying readers happens
-after the value has sent.
+isn't true for senders. 
+
+If a sender blocks, that means that the system is backlogged and something else has to consure the stacked up items.
+
+Furthermore, it puts more of a performance penalty on the queue and the latency hit for notifying senders comes before the queue action is finished, while notifying readers happens after the value has sent.
 
 #### Why can the futures sender park even though senders can't block?
 It's required for futures api to work sensibly, since when futures can't send into the queue
@@ -391,8 +313,7 @@ answer because any attempt to answer it will be racing against writer updates, a
 to transform the idea of 'which stream is behind' into something actionable by a program.
 
 #### Is it possible to select from a set of MultiQueues?
-No, it is not currently. Since performance is a key feature of the queue, I wouldn't want
-to make amends to allow select if they would negatively affect performance.
+No, it is not currently. All items in the queue are not shared so to have a good performance.
 
 #### What happens if consumers of one stream fall behind?
 The queue won't overwrite a datapoint until all streams have advanced past it,
@@ -408,7 +329,3 @@ up to date with the individual feeds and markets fall into disarray.
 but then gotten stuck will block readers from progressing. There is a lockless MPMC bounded queue,
 but it requires a statically known max senders and I don't think can be extended to broadcast.
 In practice, it will rarely ever matter.
-
-<a name = "ft2">2</a> These benchmarks had extremely varying benchmarks so I took the upper bound. On some other machines
-they showed only minor performance differences compared to the spsc case so
-I think in practice the effective throughput will be much higher
