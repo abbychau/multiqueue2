@@ -12,7 +12,7 @@ MultiQueue2 is a fast bounded mpmc queue that supports broadcast/broadcast style
 This version tries to fix these. By default, it is now using a condvar block. For `_fut_` async channels, all items are parked quickly without initial spin locks.
 
 The use of this queue is virtually lockless but technically and strictly speaking not.
-There are three kind of locks:
+There are three kinds of lock:
 1. Spin with `std::thread::yield_now`
 2. Busy Spin
 3. Condvar blocking
@@ -23,7 +23,7 @@ All dependencies are upgraded and all warnings are fixed and upgraded to 2018.
 
 
 
-TOC: [Overview](#over)| [Examples](#examples) | [MPMC Mode](#mpmc) | [Futures Mode](#futures) | [Benchmarks](#bench) | [FAQ](#faq) | [Footnotes](#footnotes)
+TOC: [Overview](#over) | [Examples](#examples) | [MPMC Mode](#mpmc) | [Futures Mode](#futures) | [Benchmarks](#bench) | [FAQ](#faq)
 
 ## <a name = "over">Overview</a>
 
