@@ -230,7 +230,8 @@ mod tests {
                     }
                 });
             }
-        }).unwrap();
+        })
+        .unwrap();
         assert_eq!(0, mycounted.load(Relaxed));
         assert_eq!(
             wrap_size as usize * goaround * nthread,

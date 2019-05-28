@@ -22,7 +22,8 @@ fn spsc_example() {
             }
         }
         drop(send);
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 fn spsc_bcast_example() {
@@ -55,7 +56,8 @@ fn spsc_bcast_example() {
             }
         }
         drop(send);
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 fn spmc_bcast_example() {
@@ -88,7 +90,8 @@ fn spmc_bcast_example() {
             }
         }
         drop(send);
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 fn wacky_example() {
@@ -143,7 +146,8 @@ fn wacky_example() {
             }
         }
         drop(send);
-    }).unwrap();
+    })
+    .unwrap();
 }
 
 fn main() {

@@ -316,9 +316,9 @@ mod read_cursor;
 pub mod wait;
 
 pub use crate::broadcast::{
-    broadcast_fut_queue, broadcast_queue, broadcast_queue_with, BroadcastFutReceiver,
-    BroadcastFutSender, BroadcastFutUniReceiver, BroadcastReceiver, BroadcastSender,
-    BroadcastUniReceiver,
+    broadcast_fut_queue, broadcast_fut_queue_with, broadcast_queue, broadcast_queue_with,
+    BroadcastFutReceiver, BroadcastFutSender, BroadcastFutUniReceiver, BroadcastReceiver,
+    BroadcastSender, BroadcastUniReceiver,
 };
 
 pub use crate::mpmc::{

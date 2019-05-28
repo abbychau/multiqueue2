@@ -63,7 +63,8 @@ fn runit(name: &str, n_senders: usize, n_readers: usize) {
         }
         reader.unsubscribe();
         barrier.wait();
-    }).unwrap();
+    })
+    .unwrap();
     let ns_spent = (ns_atomic.load(Ordering::Relaxed) as f64) / n_readers as f64;
     let ns_per_item = ns_spent / (num_do as f64);
     println!(

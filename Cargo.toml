@@ -1,6 +1,6 @@
 [package]
 name = "multiqueue2"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Sam Schetterer <samschet@gmail.com>", "Abby Chau <i@abby.md>"]
 license = "MIT"
 description = "A fast mpmc broadcast queue"
@@ -18,3 +18,6 @@ smallvec = "0.6.9"
 parking_lot = "0.8.0"
 time = "0.1.42"
 atomic_utilities = "0.5.0"
+
+# tokio = "0.1.20"
+# tokio-timer = "0.2.11"

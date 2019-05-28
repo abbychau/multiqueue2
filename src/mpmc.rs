@@ -824,7 +824,8 @@ mod test {
                 }
                 assert!(sreader.try_recv().is_err());
             });
-        }).unwrap();
+        })
+        .unwrap();
     }
 
     #[test]
@@ -877,7 +878,8 @@ mod test {
                 });
             }
             reader.unsubscribe();
-        }).unwrap();
+        })
+        .unwrap();
         assert_eq!(senders * num_loop, counter.load(Ordering::SeqCst));
     }
 

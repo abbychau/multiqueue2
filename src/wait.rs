@@ -20,7 +20,7 @@ use crate::countedindex::{past, rm_tag};
 extern crate parking_lot;
 
 pub const DEFAULT_YIELD_SPINS: usize = 50;
-pub const DEFAULT_TRY_SPINS: usize = 1000;
+pub const DEFAULT_TRY_SPINS: usize = 50;
 pub const DEFAULT_CHECK_DELAY: u64 = 20;
 
 #[inline(always)]
@@ -285,7 +285,8 @@ mod test {
                 });
             }
             reader.unsubscribe();
-        }).unwrap();
+        })
+        .unwrap();
     }
 
     fn test_waiter<T: Wait + Clone + 'static>(waiter: T) {

@@ -1,7 +1,7 @@
 use crate::countedindex::Index;
 use crate::multiqueue::{
-    futures_multiqueue, BCast, FutInnerRecv, FutInnerSend, FutInnerUniRecv, InnerRecv, InnerSend,
-    MultiQueue,
+    futures_multiqueue, futures_multiqueue_with, BCast, FutInnerRecv, FutInnerSend,
+    FutInnerUniRecv, InnerRecv, InnerSend, MultiQueue,
 };
 use crate::wait::Wait;
 
@@ -886,6 +886,18 @@ pub fn broadcast_fut_queue<T: Clone>(
     )
 }
 
+pub fn broadcast_fut_queue_with<T: Clone>(
+    capacity: Index,
+    try_spins: usize,
+    yield_spins: usize,
+) -> (BroadcastFutSender<T>, BroadcastFutReceiver<T>) {
+    let (send, recv) = futures_multiqueue_with::<BCast<T>, T>(capacity, try_spins, yield_spins);
+    (
+        BroadcastFutSender { sender: send },
+        BroadcastFutReceiver { receiver: recv },
+    )
+}
+
 unsafe impl<T: Send + Sync + Clone> Send for BroadcastSender<T> {}
 unsafe impl<T: Send + Sync + Clone> Send for BroadcastReceiver<T> {}
 unsafe impl<T: Send + Sync + Clone> Send for BroadcastUniReceiver<T> {}
@@ -968,7 +980,8 @@ mod test {
                 });
             }
             reader.unsubscribe();
-        }).unwrap();
+        })
+        .unwrap();
     }
 
     #[test]
@@ -1067,7 +1080,8 @@ mod test {
                 }
             }
             reader.unsubscribe();
-        }).unwrap();
+        })
+        .unwrap();
         assert_eq!(
             senders * receivers * num_loop,
             counter.load(Ordering::SeqCst)
