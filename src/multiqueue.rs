@@ -210,11 +210,11 @@ struct FutWait {
 }
 
 impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
-    pub fn new(_capacity: Index) -> (InnerSend<RW, T>, InnerRecv<RW, T>) {
-        MultiQueue::new_with(_capacity, BlockingWait::new())
+    pub fn create_tx_rx(_capacity: Index) -> (InnerSend<RW, T>, InnerRecv<RW, T>) {
+        MultiQueue::create_tx_rx_with(_capacity, BlockingWait::new())
     }
 
-    pub fn new_with<W: Wait + 'static>(
+    pub fn create_tx_rx_with<W: Wait + 'static>(
         capacity: Index,
         wait: W,
     ) -> (InnerSend<RW, T>, InnerRecv<RW, T>) {
@@ -250,7 +250,7 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
             refs: refdat,
             capacity: capacity as isize,
             waiter: wait,
-            needs_notify: needs_notify,
+            needs_notify,
             mk: PhantomData,
             d3: unsafe { mem::uninitialized() },
 
@@ -269,7 +269,7 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
 
         let mreader = InnerRecv {
             queue: qarc.clone(),
-            reader: reader,
+            reader,
             token: qarc.manager.get_token(),
             alive: true,
         };
@@ -621,6 +621,8 @@ impl<RW: QueueRW<T>, T> FutInnerSend<RW, T> {
     }
 }
 
+type IntoSingleResult<RW, R, F, T> = Result<FutInnerUniRecv<RW, R, F, T>, (F, FutInnerRecv<RW, T>)>;
+
 impl<RW: QueueRW<T>, T> FutInnerRecv<RW, T> {
     /// Identical to InnerRecv::try_recv()
     #[inline(always)]
@@ -645,10 +647,7 @@ impl<RW: QueueRW<T>, T> FutInnerRecv<RW, T> {
 
     /// Attempts to transform this receiver into a FutInnerUniRecv
     /// calling the passed function on the input data.
-    pub fn into_single<R, F: FnMut(&T) -> R>(
-        self,
-        op: F,
-    ) -> Result<FutInnerUniRecv<RW, R, F, T>, (F, FutInnerRecv<RW, T>)> {
+    pub fn into_single<R, F: FnMut(&T) -> R>(self, op: F) -> IntoSingleResult<RW, R, F, T> {
         let new_mreader;
         let new_pwait = self.prod_wait.clone();
         let new_wait = self.wait.clone();
@@ -661,7 +660,7 @@ impl<RW: QueueRW<T>, T> FutInnerRecv<RW, T> {
                 reader: new_mreader,
                 wait: new_wait,
                 prod_wait: new_pwait,
-                op: op,
+                op,
             })
         } else {
             Err((
@@ -712,7 +711,7 @@ impl<RW: QueueRW<T>, R, F: FnMut(&T) -> R, T> FutInnerUniRecv<RW, R, F, T> {
             reader: rx,
             wait: self.wait.clone(),
             prod_wait: self.prod_wait.clone(),
-            op: op,
+            op,
         }
     }
 
@@ -822,7 +821,7 @@ impl FutWait {
 
     pub fn with_spins(spins_first: usize, spins_yield: usize) -> FutWait {
         FutWait {
-            spins_first: spins_first,
+            spins_first,
             spins_yield,
             parked: parking_lot::Mutex::new(VecDeque::new()),
         }
@@ -1076,7 +1075,6 @@ unsafe impl<RW: QueueRW<T>, T> Send for FutInnerSend<RW, T> {}
 unsafe impl<RW: QueueRW<T>, T> Send for FutInnerRecv<RW, T> {}
 unsafe impl<RW: QueueRW<T>, R, F: FnMut(&T) -> R, T> Send for FutInnerUniRecv<RW, R, F, T> {}
 
-
 /// Usage: futures_multiqueue(`capacity`)
 /// This is equivalent to `futures_multiqueue_with(capacity,50,20)`.
 pub fn futures_multiqueue<RW: QueueRW<T>, T>(
@@ -1098,12 +1096,11 @@ pub fn futures_multiqueue<RW: QueueRW<T>, T>(
     (ftx, rtx)
 }
 
-
 /// Usage: futures_multiqueue_with(`capacity`,`try_spins`,`yield_spins`)
 /// `capacity` is the maximum item to be allowed in queue; when it is full, `Err(Full{...})` will be emitted
 /// `try_spins` is a performant, low latency blocking wait for lightweight conflict solving, lower this number when your CPU usage is high.
 /// `yield_spins` is still busy but slowered by `yield()`, this number can be small.
-/// 
+///
 /// `futures_multiqueue_with(1000,0,0)` is possible, which  will turn this hybrid-lock into a kernal lock.
 /// Feel free to test different setting that matches your system.
 pub fn futures_multiqueue_with<RW: QueueRW<T>, T>(

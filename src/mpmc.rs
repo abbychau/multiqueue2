@@ -272,7 +272,7 @@ impl<T> MPMCReceiver<T> {
     ///     }
     /// }
     /// ```
-    pub fn try_iter<'a>(&'a self) -> MPMCRefIter<'a, T> {
+    pub fn try_iter(&self) -> MPMCRefIter<'_, T> {
         MPMCRefIter { recv: self }
     }
 }
@@ -422,7 +422,7 @@ impl<T> MPMCUniReceiver<T> {
     ///     }
     /// }
     /// ```
-    pub fn try_iter_with<'a, R, F: FnMut(&T) -> R>(&'a self, op: F) -> MPMCUniRefIter<'a, R, F, T> {
+    pub fn try_iter_with<R, F: FnMut(&T) -> R>(&self, op: F) -> MPMCUniRefIter<R, F, T> {
         MPMCUniRefIter { recv: self, op }
     }
 }
@@ -723,7 +723,7 @@ impl<'a, R, F: FnMut(&T) -> R, T: 'a> Iterator for MPMCUniRefIter<'a, R, F, T> {
 /// ```
 
 pub fn mpmc_queue<T>(capacity: Index) -> (MPMCSender<T>, MPMCReceiver<T>) {
-    let (send, recv) = MultiQueue::<MPMC<T>, T>::new(capacity);
+    let (send, recv) = MultiQueue::<MPMC<T>, T>::create_tx_rx(capacity);
     (MPMCSender { sender: send }, MPMCReceiver { receiver: recv })
 }
 
@@ -731,7 +731,7 @@ pub fn mpmc_queue_with<T, W: Wait + 'static>(
     capacity: Index,
     w: W,
 ) -> (MPMCSender<T>, MPMCReceiver<T>) {
-    let (send, recv) = MultiQueue::<MPMC<T>, T>::new_with(capacity, w);
+    let (send, recv) = MultiQueue::<MPMC<T>, T>::create_tx_rx_with(capacity, w);
     (MPMCSender { sender: send }, MPMCReceiver { receiver: recv })
 }
 

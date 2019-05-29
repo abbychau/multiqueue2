@@ -844,7 +844,7 @@ impl<'a, R, F: FnMut(&T) -> R, T: Clone + Sync + 'a> Iterator for BroadcastUniRe
 /// assert_eq!(10, r.try_recv().unwrap());
 /// ```
 pub fn broadcast_queue<T: Clone>(capacity: Index) -> (BroadcastSender<T>, BroadcastReceiver<T>) {
-    let (send, recv) = MultiQueue::<BCast<T>, T>::new(capacity);
+    let (send, recv) = MultiQueue::<BCast<T>, T>::create_tx_rx(capacity);
     (
         BroadcastSender { sender: send },
         BroadcastReceiver { receiver: recv },
@@ -867,7 +867,7 @@ pub fn broadcast_queue_with<T: Clone, W: Wait + 'static>(
     capacity: Index,
     wait: W,
 ) -> (BroadcastSender<T>, BroadcastReceiver<T>) {
-    let (send, recv) = MultiQueue::<BCast<T>, T>::new_with(capacity, wait);
+    let (send, recv) = MultiQueue::<BCast<T>, T>::create_tx_rx_with(capacity, wait);
     (
         BroadcastSender { sender: send },
         BroadcastReceiver { receiver: recv },
