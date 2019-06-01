@@ -1,7 +1,7 @@
 # MultiQueue2: Fast MPMC Broadcast Queue
 
 [![Build Status](https://travis-ci.org/abbychau/multiqueue2.svg?branch=master)](https://travis-ci.org/abbychau/multiqueue2)
-
+[![Crates.io](https://img.shields.io/crates/v/multiqueue2.svg)](https://crates.io/crates/multiqueue2)
 
 MultiQueue2 is a fast bounded mpmc queue that supports broadcast/broadcast style operations 
 
