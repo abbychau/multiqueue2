@@ -658,18 +658,43 @@ impl<R, F: FnMut(&T) -> R, T: Clone + Sync> BroadcastFutUniReceiver<R, F, T> {
     }
 }
 
+impl<T: Clone> Sink for &BroadcastFutSender<T> {
+    type SinkItem = T;
+    type SinkError = SendError<T>;
+
+    #[inline(always)]
+    fn start_send(&mut self, msg: T) -> StartSend<T, SendError<T>> {
+        (&self.sender).start_send(msg)
+    }
+
+    #[inline(always)]
+    fn poll_complete(&mut self) -> Poll<(), SendError<T>> {
+        Ok(Async::Ready(()))
+    }
+}
+
 impl<T: Clone> Sink for BroadcastFutSender<T> {
     type SinkItem = T;
     type SinkError = SendError<T>;
 
     #[inline(always)]
     fn start_send(&mut self, msg: T) -> StartSend<T, SendError<T>> {
-        self.sender.start_send(msg)
+        (&*self).start_send(msg)
     }
 
     #[inline(always)]
     fn poll_complete(&mut self) -> Poll<(), SendError<T>> {
-        Ok(Async::Ready(()))
+        (&*self).poll_complete()
+    }
+}
+
+impl<T: Clone> Stream for &BroadcastFutReceiver<T> {
+    type Item = T;
+    type Error = ();
+
+    #[inline(always)]
+    fn poll(&mut self) -> Poll<Option<T>, ()> {
+        (&self.receiver).poll()
     }
 }
 
@@ -679,7 +704,7 @@ impl<T: Clone> Stream for BroadcastFutReceiver<T> {
 
     #[inline(always)]
     fn poll(&mut self) -> Poll<Option<T>, ()> {
-        self.receiver.poll()
+        (&*self).poll()
     }
 }
 

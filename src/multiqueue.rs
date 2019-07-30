@@ -732,7 +732,7 @@ impl<RW: QueueRW<T>, R, F: FnMut(&T) -> R, T> FutInnerUniRecv<RW, R, F, T> {
 
 //////// Fut stream/sink implementations
 
-impl<RW: QueueRW<T>, T> Sink for FutInnerSend<RW, T> {
+impl<RW: QueueRW<T>, T> Sink for &FutInnerSend<RW, T> {
     type SinkItem = T;
     type SinkError = SendError<T>;
 
@@ -760,7 +760,22 @@ impl<RW: QueueRW<T>, T> Sink for FutInnerSend<RW, T> {
     }
 }
 
-impl<RW: QueueRW<T>, T> Stream for FutInnerRecv<RW, T> {
+impl<RW: QueueRW<T>, T> Sink for FutInnerSend<RW, T> {
+    type SinkItem = T;
+    type SinkError = SendError<T>;
+
+    #[inline(always)]
+    fn start_send(&mut self, msg: T) -> StartSend<T, SendError<T>> {
+        (&*self).start_send(msg)
+    }
+
+    #[inline(always)]
+    fn poll_complete(&mut self) -> Poll<(), SendError<T>> {
+        (&*self).poll_complete()
+    }
+}
+
+impl<RW: QueueRW<T>, T> Stream for &FutInnerRecv<RW, T> {
     type Item = T;
     type Error = ();
 
@@ -783,6 +798,16 @@ impl<RW: QueueRW<T>, T> Stream for FutInnerRecv<RW, T> {
                 }
             }
         }
+    }
+}
+
+impl<RW: QueueRW<T>, T> Stream for FutInnerRecv<RW, T> {
+    type Item = T;
+    type Error = ();
+
+    #[inline(always)]
+    fn poll(&mut self) -> Poll<Option<T>, ()> {
+        (&*self).poll()
     }
 }
 
