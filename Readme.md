@@ -19,7 +19,8 @@ There are three kinds of lock:
 
 `2` is the fastest but it will take up 100% cpu. The default setting of MultiQueue2 including `_fut` channels is a mix of them. Practically, it would not be the bottleneck of the application. One use case that could be better to change to `2` would be audio and video conversion.
 
-Usage: `futures_multiqueue_with(`capacity`,`try_spins`,`yield_spins`)`
+Usage: `futures_multiqueue_with(<capacity>,<try_spins>,<yield_spins>)`
+
 `capacity` is the maximum item to be allowed in queue; when it is full, `Err(Full{...})` will be emitted
 `try_spins` is a performant, low latency blocking wait for lightweight conflict solving, lower this number when your CPU usage is .
 `yield_spins` is still busy but slowered by `yield()`, this number can be small.
