@@ -17,7 +17,18 @@ There are three kinds of lock:
 2. Busy Spin
 3. Condvar blocking
 
-`2` is the fastest but it will take up 100% cpu. The default setting of MultiQueue2 including `_fut` channels are using Condvar blocks, this will pay about 20ns overhead. However, practically, it would not be the bottleneck of the application. One use case that could be better to change to `2` would be audio and video conversion.
+`2` is the fastest but it will take up 100% cpu. The default setting of MultiQueue2 including `_fut` channels is a mix of them. Practically, it would not be the bottleneck of the application. One use case that could be better to change to `2` would be audio and video conversion.
+
+Usage: `futures_multiqueue_with(`capacity`,`try_spins`,`yield_spins`)`
+`capacity` is the maximum item to be allowed in queue; when it is full, `Err(Full{...})` will be emitted
+`try_spins` is a performant, low latency blocking wait for lightweight conflict solving, lower this number when your CPU usage is .
+`yield_spins` is still busy but slowered by `yield()`, this number can be small.
+`futures_multiqueue_with(1000,0,0)` is possible, which  will turn this hybrid-lock into a kernal lock.
+Feel free to test different setting that matches your system.
+
+
+
+
 
 All dependencies are upgraded and all warnings are fixed and upgraded to 2018.
 
