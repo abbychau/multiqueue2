@@ -2,8 +2,10 @@
 extern crate futures;
 extern crate multiqueue2 as multiqueue;
 
-use futures::future::lazy;
-use futures::{Async, Future, Sink, Stream};
+use futures::executor::block_on;
+use futures::future::{lazy, Future};
+use futures::sink::SinkExt;
+use futures::stream::StreamExt;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -20,37 +22,41 @@ fn bounds() {
 
 #[test]
 fn send_recv() {
-    let (tx, rx) = multiqueue::broadcast_fut_queue::<i32>(16);
-    let mut rx = rx.wait();
-
-    tx.send(1).wait().unwrap();
-
-    assert_eq!(rx.next().unwrap(), Ok(1));
+    block_on(async {
+        let (tx, mut rx) = multiqueue::broadcast_fut_queue::<i32>(16);
+    
+        tx.send(1).await.unwrap();
+    
+        assert_eq!(rx.next().await.unwrap(), Ok(1));    
+    })
 }
 
 #[test]
 fn send_shared_recv() {
-    let (tx1, rx) = multiqueue::broadcast_fut_queue::<i32>(16);
-    let tx2 = tx1.clone();
-    let mut rx = rx.wait();
-
-    tx1.send(1).wait().unwrap();
-    assert_eq!(rx.next().unwrap(), Ok(1));
-
-    tx2.send(2).wait().unwrap();
-    assert_eq!(rx.next().unwrap(), Ok(2));
+    block_on(async {
+        let (mut tx1, mut rx) = multiqueue::broadcast_fut_queue::<i32>(16);
+        let mut tx2 = tx1.clone();
+    
+        tx1.send(1).await.unwrap();
+        assert_eq!(rx.next().await.unwrap(), Ok(1));
+    
+        tx2.send(2).await.unwrap();
+        assert_eq!(rx.next().await.unwrap(), Ok(2));    
+    })
 }
 
 #[test]
 fn send_recv_threads() {
-    let (tx, rx) = multiqueue::broadcast_fut_queue::<i32>(16);
-    let mut rx = rx.wait();
-
-    thread::spawn(move || {
-        tx.send(1).wait().unwrap();
-    });
-
-    assert_eq!(rx.next().unwrap(), Ok(1));
+    block_on(async {
+        let (tx, rx) = multiqueue::broadcast_fut_queue::<i32>(16);
+        let mut rx = rx.wait();
+    
+        thread::spawn(move || {
+            tx.send(1).wait().unwrap();
+        });
+    
+        assert_eq!(rx.next().unwrap(), Ok(1));    
+    })
 }
 
 #[test]

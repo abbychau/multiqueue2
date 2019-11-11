@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
+use std::pin::Pin;
 use std::ptr;
 use std::sync::atomic::Ordering::*;
 use std::sync::atomic::{fence, AtomicUsize};
@@ -21,12 +22,14 @@ use crate::wait::*;
 use crate::read_cursor::{ReadCursor, Reader};
 
 extern crate atomic_utilities;
-extern crate futures;
+extern crate futures_core;
+extern crate futures_sink;
 extern crate parking_lot;
 extern crate smallvec;
 
-use self::futures::task::{current, Task};
-use self::futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
+use self::futures_core::stream::Stream;
+use self::futures_core::task::{Context, Poll, Waker};
+use self::futures_sink::Sink;
 
 use self::atomic_utilities::artificial_dep::{dependently_mut, DepOrd};
 
@@ -206,7 +209,7 @@ pub struct FutInnerUniRecv<RW: QueueRW<T>, R, F: FnMut(&T) -> R, T> {
 struct FutWait {
     spins_first: usize,
     spins_yield: usize,
-    parked: parking_lot::Mutex<VecDeque<Task>>,
+    parked: parking_lot::Mutex<VecDeque<Waker>>,
 }
 
 impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
@@ -732,68 +735,85 @@ impl<RW: QueueRW<T>, R, F: FnMut(&T) -> R, T> FutInnerUniRecv<RW, R, F, T> {
 
 //////// Fut stream/sink implementations
 
-impl<RW: QueueRW<T>, T> Sink for &FutInnerSend<RW, T> {
-    type SinkItem = T;
-    type SinkError = SendError<T>;
+impl<RW: QueueRW<T>, T> Sink<T> for &FutInnerSend<RW, T> {
+    type Error = SendError<T>;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SendError<T>>> {
+        unimplemented!()
+    }
 
     /// Essentially try_send except parks if the queue is full
-    fn start_send(&mut self, msg: T) -> StartSend<T, SendError<T>> {
-        match self
-            .prod_wait
-            .send_or_park(|m| self.writer.try_send(m), msg)
-        {
-            Ok(_) => {
-                // see InnerSend::try_recv for why this isn't in the queue
-                if self.writer.queue.needs_notify {
-                    self.writer.queue.waiter.notify();
-                }
-                Ok(AsyncSink::Ready)
-            }
-            Err(TrySendError::Full(msg)) => Ok(AsyncSink::NotReady(msg)),
-            Err(TrySendError::Disconnected(msg)) => Err(SendError(msg)),
-        }
+    fn start_send(self: Pin<&mut Self>, msg: T) -> Result<(), SendError<T>> {
+        // match self
+        //     .prod_wait
+        //     .send_or_park(|m| self.writer.try_send(m), msg)
+        // {
+        //     Ok(_) => {
+        //         // see InnerSend::try_recv for why this isn't in the queue
+        //         if self.writer.queue.needs_notify {
+        //             self.writer.queue.waiter.notify();
+        //         }
+        //         Ok(AsyncSink::Ready)
+        //     }
+        //     Err(TrySendError::Full(msg)) => Ok(AsyncSink::NotReady(msg)),
+        //     Err(TrySendError::Disconnected(msg)) => Err(SendError(msg)),
+        // }
+        unimplemented!()
     }
 
     #[inline(always)]
-    fn poll_complete(&mut self) -> Poll<(), SendError<T>> {
-        Ok(Async::Ready(()))
+    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), SendError<T>>> {
+        Poll::Ready(Ok(()))
+    }
+
+    #[inline(always)]
+    fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), SendError<T>>> {
+        Poll::Ready(Ok(()))
     }
 }
 
-impl<RW: QueueRW<T>, T> Sink for FutInnerSend<RW, T> {
-    type SinkItem = T;
-    type SinkError = SendError<T>;
+impl<RW: QueueRW<T>, T> Sink<T> for FutInnerSend<RW, T> {
+    type Error = SendError<T>;
 
     #[inline(always)]
-    fn start_send(&mut self, msg: T) -> StartSend<T, SendError<T>> {
-        (&*self).start_send(msg)
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SendError<T>>> {
+        Pin::new(&mut &*self).poll_ready(cx)
     }
 
     #[inline(always)]
-    fn poll_complete(&mut self) -> Poll<(), SendError<T>> {
-        (&*self).poll_complete()
+    fn start_send(self: Pin<&mut Self>, msg: T) -> Result<(), SendError<T>> {
+        Pin::new(&mut &*self).start_send(msg)
+    }
+
+    #[inline(always)]
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SendError<T>>> {
+        Pin::new(&mut &*self).poll_flush(cx)
+    }
+
+    #[inline(always)]
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), SendError<T>>> {
+        Pin::new(&mut &*self).poll_close(cx)
     }
 }
 
 impl<RW: QueueRW<T>, T> Stream for &FutInnerRecv<RW, T> {
     type Item = T;
-    type Error = ();
 
     /// Essentially the same as recv
     #[inline]
-    fn poll(&mut self) -> Poll<Option<T>, ()> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.reader.examine_signals();
         loop {
             match self.reader.queue.try_recv(&self.reader.reader) {
                 Ok(msg) => {
                     self.prod_wait.notify_all();
-                    return Ok(Async::Ready(Some(msg)));
+                    return Poll::Ready(Some(msg));
                 }
-                Err((_, TryRecvError::Disconnected)) => return Ok(Async::Ready(None)),
+                Err((_, TryRecvError::Disconnected)) => return Poll::Ready(None),
                 Err((pt, _)) => {
                     let count = self.reader.reader.load_count(Relaxed);
-                    if unsafe { self.wait.fut_wait(count, &*pt, &self.reader.queue.writers) } {
-                        return Ok(Async::NotReady);
+                    if unsafe { self.wait.fut_wait(cx, count, &*pt, &self.reader.queue.writers) } {
+                        return Poll::Pending;
                     }
                 }
             }
@@ -803,33 +823,32 @@ impl<RW: QueueRW<T>, T> Stream for &FutInnerRecv<RW, T> {
 
 impl<RW: QueueRW<T>, T> Stream for FutInnerRecv<RW, T> {
     type Item = T;
-    type Error = ();
 
     #[inline(always)]
-    fn poll(&mut self) -> Poll<Option<T>, ()> {
-        (&*self).poll()
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        Pin::new(&mut &*self).poll_next(cx)
     }
 }
 
-impl<RW: QueueRW<T>, R, F: for<'r> FnMut(&T) -> R, T> Stream for FutInnerUniRecv<RW, R, F, T> {
+impl<RW: QueueRW<T>, R, F: for<'r> FnMut(&T) -> R + Unpin, T> Stream for FutInnerUniRecv<RW, R, F, T> {
     type Item = R;
-    type Error = ();
 
     #[inline]
-    fn poll(&mut self) -> Poll<Option<R>, ()> {
-        self.reader.examine_signals();
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<R>> {
+        let this = self.get_mut();
+        this.reader.examine_signals();
         loop {
-            let opref = &mut self.op;
-            match self.reader.queue.try_recv_view(opref, &self.reader.reader) {
+            let opref = &mut this.op;
+            match this.reader.queue.try_recv_view(opref, &this.reader.reader) {
                 Ok(msg) => {
-                    self.prod_wait.notify_all();
-                    return Ok(Async::Ready(Some(msg)));
+                    this.prod_wait.notify_all();
+                    return Poll::Ready(Some(msg));
                 }
-                Err((_, _, TryRecvError::Disconnected)) => return Ok(Async::Ready(None)),
+                Err((_, _, TryRecvError::Disconnected)) => return Poll::Ready(None),
                 Err((_, pt, _)) => {
-                    let count = self.reader.reader.load_count(Relaxed);
-                    if unsafe { self.wait.fut_wait(count, &*pt, &self.reader.queue.writers) } {
-                        return Ok(Async::NotReady);
+                    let count = this.reader.reader.load_count(Relaxed);
+                    if unsafe { this.wait.fut_wait(cx, count, &*pt, &this.reader.queue.writers) } {
+                        return Poll::Pending;
                     }
                 }
             }
@@ -852,8 +871,8 @@ impl FutWait {
         }
     }
 
-    pub fn fut_wait(&self, seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
-        if self.spin(seq, at, wc) && self.park(seq, at, wc) {
+    pub fn fut_wait(&self, cx: &mut Context<'_>, seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
+        if self.spin(seq, at, wc) && self.park(cx, seq, at, wc) {
             ::std::thread::sleep(::std::time::Duration::from_millis(100));
             true
         } else {
@@ -877,17 +896,18 @@ impl FutWait {
         true
     }
 
-    pub fn park(&self, seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
+    pub fn park(&self, cx: &mut Context<'_>, seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
         let mut parked = self.parked.lock();
         if check(seq, at, wc) {
             return false;
         }
-        parked.push_back(current());
+        parked.push_back(cx.waker().clone());
         true
     }
 
     fn send_or_park<T, F: Fn(T) -> Result<(), TrySendError<T>>>(
         &self,
+        cx: &mut Context<'_>,
         f: F,
         mut val: T,
     ) -> Result<(), TrySendError<T>> {
@@ -909,7 +929,7 @@ impl FutWait {
         let mut parked = self.parked.lock();
         match f(val) {
             Err(TrySendError::Full(v)) => {
-                parked.push_back(current());
+                parked.push_back(cx.waker().clone());
                 Err(TrySendError::Full(v))
             }
             v => v,
@@ -919,7 +939,7 @@ impl FutWait {
     fn notify_all(&self) {
         let mut parked = self.parked.lock();
         for val in parked.drain(..) {
-            val.notify();
+            val.wake();
         }
     }
 }
@@ -935,14 +955,14 @@ impl Wait for FutWait {
         if parked.len() > 0 {
             if parked.len() > 8 {
                 for val in parked.drain(..) {
-                    val.notify();
+                    val.wake();
                 }
             } else {
-                let mut inline_v = smallvec::SmallVec::<[Task; 9]>::new();
+                let mut inline_v = smallvec::SmallVec::<[Waker; 9]>::new();
                 inline_v.extend(parked.drain(..));
                 drop(parked);
                 for val in inline_v.drain() {
-                    val.notify();
+                    val.wake();
                 }
             }
         }
