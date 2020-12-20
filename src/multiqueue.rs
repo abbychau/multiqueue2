@@ -1094,10 +1094,10 @@ impl<RW: QueueRW<T>, T> fmt::Debug for FutInnerRecv<RW, T> {
 
 unsafe impl<RW: QueueRW<T>, T> Sync for MultiQueue<RW, T> {}
 unsafe impl<RW: QueueRW<T>, T> Send for MultiQueue<RW, T> {}
-unsafe impl<RW: QueueRW<T>, T> Send for InnerSend<RW, T> {}
-unsafe impl<RW: QueueRW<T>, T> Send for InnerRecv<RW, T> {}
-unsafe impl<RW: QueueRW<T>, T> Send for FutInnerSend<RW, T> {}
-unsafe impl<RW: QueueRW<T>, T> Send for FutInnerRecv<RW, T> {}
+unsafe impl<RW: QueueRW<T>, T: Send> Send for InnerSend<RW, T> {}
+unsafe impl<RW: QueueRW<T>, T: Send> Send for InnerRecv<RW, T> {}
+unsafe impl<RW: QueueRW<T>, T: Send> Send for FutInnerSend<RW, T> {}
+unsafe impl<RW: QueueRW<T>, T: Send> Send for FutInnerRecv<RW, T> {}
 unsafe impl<RW: QueueRW<T>, R, F: FnMut(&T) -> R, T> Send for FutInnerUniRecv<RW, R, F, T> {}
 
 /// Usage: futures_multiqueue(`capacity`)
