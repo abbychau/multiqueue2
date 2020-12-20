@@ -1115,8 +1115,8 @@ pub fn futures_multiqueue<RW: QueueRW<T>, T>(
     };
     let rtx = FutInnerRecv {
         reader: rx,
-        wait: cons_arc.clone(),
-        prod_wait: prod_arc.clone(),
+        wait: cons_arc,
+        prod_wait: prod_arc,
     };
     (ftx, rtx)
 }
@@ -1143,8 +1143,8 @@ pub fn futures_multiqueue_with<RW: QueueRW<T>, T>(
     };
     let rtx = FutInnerRecv {
         reader: rx,
-        wait: cons_arc.clone(),
-        prod_wait: prod_arc.clone(),
+        wait: cons_arc,
+        prod_wait: prod_arc,
     };
     (ftx, rtx)
 }

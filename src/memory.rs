@@ -129,7 +129,7 @@ impl MemoryManager {
 
     #[cold]
     fn start_free(&self, elemvec: &mut Vec<ToFree>) {
-        let _ = self.mem_manager.try_lock().map(|mut inner| {
+        let _lock = self.mem_manager.try_lock().map(|mut inner| {
             let cur_epoch = self.epoch.load(Ordering::Relaxed);
             if inner.epoch == cur_epoch {
                 let mut newv = Vec::new();
@@ -147,7 +147,7 @@ impl MemoryManager {
         let mut elemvec = self.wait_to_free.lock().unwrap();
         elemvec.push(ToFree::new(pt, num));
         {
-            let _ = self.mem_manager.try_lock().map(|mut inner| {
+            let _lock = self.mem_manager.try_lock().map(|mut inner| {
                 let epoch = self.epoch.load(Ordering::SeqCst);
                 if inner.try_freeing(epoch) {
                     self.signal.clear_epoch(Ordering::Release);
