@@ -8,7 +8,7 @@ use crate::wait::Wait;
 use std::sync::mpsc::{RecvError, SendError, TryRecvError, TrySendError};
 
 extern crate futures;
-use self::futures::{Async, Poll, Sink, StartSend, Stream};
+use futures::{Async, Poll, Sink, StartSend, Stream};
 
 /// This class is the sending half of the broadcasting ```MultiQueue```. It supports both
 /// single and multi consumer modes with competitive performance in each case.

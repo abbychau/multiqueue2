@@ -12,11 +12,11 @@ categories = ['asynchronous', 'concurrency', 'data-structures', 'algorithms']
 edition = "2018"
 
 [dependencies]
-crossbeam = "0.7.1"
-futures = "0.1.27"
-smallvec = "0.6.9"
-parking_lot = "0.8.0"
-time = "0.1.42"
+crossbeam = "0.8.0"
+futures = "0.1.30"
+smallvec = "1.5.1"
+parking_lot = "0.11.1"
+time = "0.2.23"
 atomic_utilities = "0.5.0"
 
 # tokio = "0.1.20"

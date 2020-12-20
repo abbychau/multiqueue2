@@ -160,7 +160,7 @@ pub struct MultiQueue<RW: QueueRW<T>, T> {
     data: *mut QueueEntry<T>,
     refs: *mut RefCnt,
     capacity: isize,
-    pub waiter: Arc<Wait>,
+    pub waiter: Arc<dyn Wait>,
     needs_notify: bool,
     mk: PhantomData<RW>,
     d3: [u8; 64],
@@ -221,7 +221,7 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
         MultiQueue::new_internal(capacity, Arc::new(wait))
     }
 
-    fn new_internal(_capacity: Index, wait: Arc<Wait>) -> (InnerSend<RW, T>, InnerRecv<RW, T>) {
+    fn new_internal(_capacity: Index, wait: Arc<dyn Wait>) -> (InnerSend<RW, T>, InnerRecv<RW, T>) {
         let capacity = get_valid_wrap(_capacity);
         let queuedat: *mut QueueEntry<T> = alloc::allocate(capacity as usize);
         let refdat: *mut RefCnt = alloc::allocate(capacity as usize);
@@ -238,12 +238,12 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
         let (cursor, reader) = ReadCursor::new(capacity);
         let needs_notify = wait.needs_notify();
         let queue = MultiQueue {
-            d1: unsafe { mem::uninitialized() },
+            d1: unsafe { mem::MaybeUninit::uninit().assume_init() },
 
             head: CountedIndex::new(capacity),
             tail_cache: AtomicUsize::new(0),
             writers: AtomicUsize::new(1),
-            d2: unsafe { mem::uninitialized() },
+            d2: unsafe { mem::MaybeUninit::uninit().assume_init() },
 
             tail: cursor,
             data: queuedat,
@@ -252,11 +252,11 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
             waiter: wait,
             needs_notify,
             mk: PhantomData,
-            d3: unsafe { mem::uninitialized() },
+            d3: unsafe { mem::MaybeUninit::uninit().assume_init() },
 
             manager: MemoryManager::new(),
 
-            d4: unsafe { mem::uninitialized() },
+            d4: unsafe { mem::MaybeUninit::uninit().assume_init() },
         };
 
         let qarc = Arc::new(queue);
@@ -941,7 +941,7 @@ impl Wait for FutWait {
                 let mut inline_v = smallvec::SmallVec::<[Task; 9]>::new();
                 inline_v.extend(parked.drain(..));
                 drop(parked);
-                for val in inline_v.drain() {
+                for val in inline_v.drain(..) {
                     val.notify();
                 }
             }
