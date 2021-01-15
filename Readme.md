@@ -21,11 +21,11 @@ There are three kinds of lock:
 
 Usage: `futures_multiqueue_with(<capacity>,<try_spins>,<yield_spins>)`
 
-`capacity` is the maximum item to be allowed in queue; when it is full, `Err(Full{...})` will be emitted
-`try_spins` is a performant, low latency blocking wait for lightweight conflict solving, lower this number when your CPU usage is .
-`yield_spins` is still busy but slowered by `yield()`, this number can be small.
-`futures_multiqueue_with(1000,0,0)` is possible, which  will turn this hybrid-lock into a kernal lock.
-Feel free to test different setting that matches your system.
+`capacity` is the maximum item to be allowed in queue; when it is full, `Err(Full{...})` will be emitted. 
+`try_spins` is a performant, low latency blocking wait for lightweight conflict solving, lower this number when your CPU usage is high.  
+`yield_spins` is still busy but slowered by `yield()`, this number can be small.  
+`futures_multiqueue_with(1000,0,0)` is possible, which  will turn this hybrid-lock into a kernal lock.  
+Feel free to test different setting that matches your system.  
 
 
 

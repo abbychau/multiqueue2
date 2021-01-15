@@ -3,13 +3,18 @@ extern crate multiqueue2 as multiqueue;
 extern crate time;
 
 use crate::multiqueue::{broadcast_queue_with, wait, BroadcastReceiver, BroadcastSender};
+use time::OffsetDateTime;
 
-use time::precise_time_ns;
 
 use crossbeam::scope;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Barrier;
+
+
+fn precise_time_ns() -> u32{
+    OffsetDateTime::now_utc().nanosecond() - OffsetDateTime::unix_epoch().nanosecond()
+}
 
 #[inline(never)]
 fn recv(barrier: &Barrier, mreader: BroadcastReceiver<u64>, sum: &AtomicUsize, check: bool) {

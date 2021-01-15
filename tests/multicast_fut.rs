@@ -66,7 +66,7 @@ fn send_recv_threads_no_capacity() {
 
     let t = thread::spawn(move || {
         tx = tx.send(1).wait().unwrap();
-        tx = tx.send(2).wait().unwrap();
+        tx.send(2).wait().unwrap();
     });
 
     thread::sleep(Duration::from_millis(100));
