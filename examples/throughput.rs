@@ -1,19 +1,15 @@
-extern crate crossbeam;
-extern crate multiqueue2 as multiqueue;
-extern crate time;
-
-use crate::multiqueue::{broadcast_queue_with, wait, BroadcastReceiver, BroadcastSender};
-use time::OffsetDateTime;
-
+use multiqueue2 as multiqueue;
 
 use crossbeam::scope;
+use time::OffsetDateTime;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Barrier;
 
+use crate::multiqueue::{broadcast_queue_with, wait, BroadcastReceiver, BroadcastSender};
 
 fn precise_time_ns() -> u32{
-    OffsetDateTime::now_utc().nanosecond() - OffsetDateTime::unix_epoch().nanosecond()
+    OffsetDateTime::now_utc().nanosecond() - OffsetDateTime::UNIX_EPOCH.nanosecond()
 }
 
 #[inline(never)]
