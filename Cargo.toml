@@ -1,25 +1,23 @@
 [package]
 name = "multiqueue2"
 version = "0.1.7"
-authors = ["Sam Schetterer <samschet@gmail.com>", "Abby Chau <i@abby.md>"]
+authors = ["Sam Schetterer <samschet@gmail.com>", "Abby Chau <i@abby.md>", "Erick Arce <erick.arce10@gmail.com>"]
 license = "MIT"
 description = "A fast mpmc broadcast queue"
-repository = "https://github.com/abbychau/multiqueue2"
-documentation = "https://docs.rs/multiqueue2"
+repository = "https://github.com/canal-street/ferring"
+documentation = "https://docs.rs/ferring"
 readme = "Readme.md"
 keywords = ["queue", "mpmc", "lockless", "broadcast", "message"]
 categories = ['asynchronous', 'concurrency', 'data-structures', 'algorithms']
-edition = "2018"
+edition = "2024"
 
 [dependencies]
-crossbeam = "0.8.1"
-futures = "0.1.31"
-smallvec = "1.6.1"
-parking_lot = "0.11.1"
+crossbeam = "0.8.4"
+futures = "0.3.31"
+smallvec = "1.15.1"
+parking_lot = "0.12.4"
 atomic_utilities = "0.5.0"
+tokio = { version = "1.47.0", features = ["macros", "rt", "time"] }
 
 [dev-dependencies]
-time = "0.3"
-
-# tokio = "0.1.20"
-# tokio-timer = "0.2.11"
+time = "0.3.41"

@@ -1,14 +1,15 @@
 use crate::countedindex::Index;
 use crate::multiqueue::{
-    futures_multiqueue, futures_multiqueue_with, BCast, FutInnerRecv, FutInnerSend,
-    FutInnerUniRecv, InnerRecv, InnerSend, MultiQueue,
+    BCast, FutInnerRecv, FutInnerSend, FutInnerUniRecv, InnerRecv, InnerSend, MultiQueue,
+    futures_multiqueue, futures_multiqueue_with,
 };
 use crate::wait::Wait;
 
 use std::sync::mpsc::{RecvError, SendError, TryRecvError, TrySendError};
+use std::task::{Context, Poll};
 
 extern crate futures;
-use futures::{Async, Poll, Sink, StartSend, Stream};
+use futures::{Sink, SinkExt, Stream, StreamExt};
 
 /// This class is the sending half of the broadcasting ```MultiQueue```. It supports both
 /// single and multi consumer modes with competitive performance in each case.
@@ -658,63 +659,68 @@ impl<R, F: FnMut(&T) -> R, T: Clone + Sync> BroadcastFutUniReceiver<R, F, T> {
     }
 }
 
-impl<T: Clone> Sink for &BroadcastFutSender<T> {
-    type SinkItem = T;
-    type SinkError = SendError<T>;
+impl<T: Clone + Unpin> Sink<T> for BroadcastFutSender<T> {
+    type Error = SendError<T>;
 
     #[inline(always)]
-    fn start_send(&mut self, msg: T) -> StartSend<T, SendError<T>> {
-        (&self.sender).start_send(msg)
+    fn poll_ready(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        self.get_mut().sender.poll_ready_unpin(cx)
     }
 
     #[inline(always)]
-    fn poll_complete(&mut self) -> Poll<(), SendError<T>> {
-        Ok(Async::Ready(()))
-    }
-}
-
-impl<T: Clone> Sink for BroadcastFutSender<T> {
-    type SinkItem = T;
-    type SinkError = SendError<T>;
-
-    #[inline(always)]
-    fn start_send(&mut self, msg: T) -> StartSend<T, SendError<T>> {
-        (&*self).start_send(msg)
+    fn start_send(self: std::pin::Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+        self.get_mut().sender.start_send_unpin(item)
     }
 
     #[inline(always)]
-    fn poll_complete(&mut self) -> Poll<(), SendError<T>> {
-        (&*self).poll_complete()
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        self.get_mut().sender.poll_flush_unpin(cx)
+    }
+
+    #[inline(always)]
+    fn poll_close(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        self.get_mut().sender.poll_close_unpin(cx)
     }
 }
 
 impl<T: Clone> Stream for &BroadcastFutReceiver<T> {
     type Item = T;
-    type Error = ();
 
     #[inline(always)]
-    fn poll(&mut self) -> Poll<Option<T>, ()> {
-        (&self.receiver).poll()
+    fn poll_next(
+        self: std::pin::Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        (&self.receiver).poll_next_unpin(_cx)
     }
 }
 
 impl<T: Clone> Stream for BroadcastFutReceiver<T> {
     type Item = T;
-    type Error = ();
 
     #[inline(always)]
-    fn poll(&mut self) -> Poll<Option<T>, ()> {
-        (&*self).poll()
+    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        (&*self).poll_next_unpin(cx)
     }
 }
 
-impl<R, F: FnMut(&T) -> R, T: Clone + Sync> Stream for BroadcastFutUniReceiver<R, F, T> {
+impl<R, F: FnMut(&T) -> R + Clone + Unpin, T: Clone + Sync> Stream
+    for BroadcastFutUniReceiver<R, F, T>
+{
     type Item = R;
-    type Error = ();
 
     #[inline(always)]
-    fn poll(&mut self) -> Poll<Option<R>, ()> {
-        self.receiver.poll()
+    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.get_mut().receiver.poll_next_unpin(cx)
     }
 }
 

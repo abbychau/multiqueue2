@@ -1,13 +1,11 @@
 // For the most part, shamelessly copied from carllerche futures mpsc tests
-extern crate futures;
 extern crate multiqueue2 as multiqueue;
 
 use futures::future::lazy;
-use futures::{Async, Future, Sink, Stream};
-
+use futures::{SinkExt, StreamExt};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::mpsc::TryRecvError;
 use std::sync::{Arc, Mutex};
-use std::thread;
 use std::time::Duration;
 
 fn is_send<T: Send>() {}
@@ -18,104 +16,101 @@ fn bounds() {
     is_send::<multiqueue::MPMCFutReceiver<i32>>();
 }
 
-#[test]
-fn send_recv() {
-    let (tx, rx) = multiqueue::mpmc_fut_queue::<i32>(16);
-    let mut rx = rx.wait();
+#[tokio::test]
+async fn send_recv() {
+    let (mut tx, rx) = multiqueue::mpmc_fut_queue::<i32>(16);
 
-    tx.send(1).wait().unwrap();
+    tx.send(1).await.unwrap();
 
-    assert_eq!(rx.next().unwrap(), Ok(1));
+    assert_eq!(rx.try_recv().unwrap(), 1);
 }
 
-#[test]
-fn send_shared_recv() {
-    let (tx1, rx) = multiqueue::mpmc_fut_queue::<i32>(16);
-    let tx2 = tx1.clone();
-    let mut rx = rx.wait();
+#[tokio::test]
+async fn send_shared_recv() {
+    let (mut tx1, rx) = multiqueue::mpmc_fut_queue::<i32>(16);
+    let mut tx2 = tx1.clone();
 
-    tx1.send(1).wait().unwrap();
-    assert_eq!(rx.next().unwrap(), Ok(1));
+    tx1.send(1).await.unwrap();
+    assert_eq!(rx.try_recv().unwrap(), 1);
 
-    tx2.send(2).wait().unwrap();
-    assert_eq!(rx.next().unwrap(), Ok(2));
+    tx2.send(2).await.unwrap();
+    assert_eq!(rx.try_recv().unwrap(), 2);
 }
 
-#[test]
-fn send_recv_threads() {
-    let (tx, rx) = multiqueue::mpmc_fut_queue::<i32>(16);
-    let mut rx = rx.wait();
+#[tokio::test]
+async fn send_recv_threads() {
+    let (mut tx, rx) = multiqueue::mpmc_fut_queue::<i32>(16);
 
-    thread::spawn(move || {
-        tx.send(1).wait().unwrap();
+    tokio::spawn(async move {
+        tx.send(1).await.unwrap();
+    })
+    .await
+    .unwrap();
+
+    assert_eq!(rx.try_recv().unwrap(), 1);
+}
+
+#[tokio::test]
+async fn send_recv_threads_no_capacity() {
+    let (mut tx, mut rx) = multiqueue::mpmc_fut_queue::<i32>(0);
+
+    let t = tokio::spawn(async move {
+        tx.send(1).await.unwrap();
+        tx.send(2).await.unwrap();
     });
 
-    assert_eq!(rx.next().unwrap(), Ok(1));
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(rx.next().await.unwrap(), 1);
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(rx.next().await.unwrap(), 2);
+
+    t.await.unwrap();
 }
 
-#[test]
-fn send_recv_threads_no_capacity() {
-    let (mut tx, rx) = multiqueue::mpmc_fut_queue::<i32>(0);
-    let mut rx = rx.wait();
-
-    let t = thread::spawn(move || {
-        tx = tx.send(1).wait().unwrap();
-        tx.send(2).wait().unwrap();
-    });
-
-    thread::sleep(Duration::from_millis(100));
-    assert_eq!(rx.next().unwrap(), Ok(1));
-
-    thread::sleep(Duration::from_millis(100));
-    assert_eq!(rx.next().unwrap(), Ok(2));
-
-    t.join().unwrap();
-}
-
-#[test]
-fn recv_close_gets_none() {
+#[tokio::test]
+async fn recv_close_gets_none() {
     let (tx, rx) = multiqueue::mpmc_fut_queue::<i32>(10);
 
     // Run on a task context
-    lazy(move || {
+    lazy(move |_| {
         rx.unsubscribe();
 
         drop(tx);
 
         Ok::<(), ()>(())
     })
-    .wait()
+    .await
     .unwrap();
 }
 
-#[test]
-fn tx_close_gets_none() {
-    let (_, mut rx) = multiqueue::mpmc_fut_queue::<i32>(10);
+#[tokio::test]
+async fn tx_close_gets_none() {
+    let (_, rx) = multiqueue::mpmc_fut_queue::<i32>(10);
 
     // Run on a task context
-    lazy(move || {
-        assert_eq!(rx.poll(), Ok(Async::Ready(None)));
-        assert_eq!(rx.poll(), Ok(Async::Ready(None)));
+    lazy(move |_| {
+        assert_eq!(rx.try_recv(), Err(TryRecvError::Disconnected));
+        assert_eq!(rx.try_recv(), Err(TryRecvError::Disconnected));
 
         Ok::<(), ()>(())
     })
-    .wait()
+    .await
     .unwrap();
 }
 
-#[test]
-fn stress_shared_bounded_hard() {
+#[tokio::test]
+async fn stress_shared_bounded_hard() {
     const AMT: u32 = 10000;
     const NTHREADS: u32 = 8;
-    let (tx, rx) = multiqueue::mpmc_fut_queue::<i32>(0);
-    let mut rx = rx.wait();
+    let (tx, mut rx) = multiqueue::mpmc_fut_queue::<i32>(0);
 
-    let t = thread::spawn(move || {
+    let t = tokio::spawn(async move {
         for _ in 0..AMT * NTHREADS {
-            assert_eq!(rx.next().unwrap(), Ok(1));
+            assert_eq!(rx.next().await.unwrap(), 1);
         }
 
-        if rx.next().is_some() {
+        if rx.recv().is_ok() {
             panic!();
         }
     });
@@ -123,20 +118,20 @@ fn stress_shared_bounded_hard() {
     for _ in 0..NTHREADS {
         let mut tx = tx.clone();
 
-        thread::spawn(move || {
+        tokio::spawn(async move {
             for _ in 0..AMT {
-                tx = tx.send(1).wait().unwrap();
+                tx.send(1).await.unwrap();
             }
         });
     }
 
     drop(tx);
 
-    t.join().ok().unwrap();
+    t.await.unwrap();
 }
 
-#[test]
-fn stress_receiver_multi_task_bounded_hard() {
+#[tokio::test]
+async fn stress_receiver_multi_task_bounded_hard() {
     const AMT: usize = 10_000;
     const NTHREADS: u32 = 2;
 
@@ -150,44 +145,58 @@ fn stress_receiver_multi_task_bounded_hard() {
         let rx = rx.clone();
         let n = n.clone();
 
-        let t = thread::spawn(move || {
+        let t = tokio::spawn(async move {
             let mut i = 0;
 
             loop {
                 i += 1;
-                let mut lock = rx.lock().ok().unwrap();
+                let rcv_rx: Option<_> = {
+                    let rx = Arc::clone(&rx);
+                    let mut lock = rx.lock().ok().unwrap();
+                    lock.take()
+                };
 
-                match lock.take() {
-                    Some(mut rx) => {
+                match rcv_rx {
+                    Some(rcv_rx) => {
                         if i % 5 == 0 {
-                            let (item, rest) = rx.into_future().wait().ok().unwrap();
+                            let (item, rest) = rcv_rx.into_future().await;
 
                             if item.is_none() {
                                 break;
                             }
 
                             n.fetch_add(1, Ordering::Relaxed);
-                            *lock = Some(rest);
+                            {
+                                let mut lock = rx.lock().ok().unwrap();
+                                *lock = Some(rest);
+                            }
                         } else {
                             // Just poll
                             let n = n.clone();
-                            let r = lazy(move || {
-                                let r = match rx.poll().unwrap() {
-                                    Async::Ready(Some(_)) => {
+                            let rx = Arc::clone(&rx);
+                            let r = lazy(move |_| {
+                                let r = match rcv_rx.try_recv() {
+                                    Ok(_) => {
                                         n.fetch_add(1, Ordering::Relaxed);
-                                        *lock = Some(rx);
+                                        {
+                                            let mut lock = rx.lock().ok().unwrap();
+                                            *lock = Some(rcv_rx);
+                                        }
                                         false
                                     }
-                                    Async::Ready(None) => true,
-                                    Async::NotReady => {
-                                        *lock = Some(rx);
+                                    Err(TryRecvError::Empty) => true,
+                                    Err(TryRecvError::Disconnected) => {
+                                        {
+                                            let mut lock = rx.lock().ok().unwrap();
+                                            *lock = Some(rcv_rx);
+                                        }
                                         false
                                     }
                                 };
 
                                 Ok::<bool, ()>(r)
                             })
-                            .wait()
+                            .await
                             .unwrap();
 
                             if r {
@@ -204,13 +213,13 @@ fn stress_receiver_multi_task_bounded_hard() {
     }
 
     for i in 0..AMT {
-        tx = tx.send(i).wait().unwrap();
+        tx.send(i).await.unwrap();
     }
 
     drop(tx);
 
     for t in th {
-        t.join().unwrap();
+        t.await.unwrap();
     }
 
     assert_eq!(AMT, n.load(Ordering::Relaxed));

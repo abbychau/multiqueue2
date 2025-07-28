@@ -1,11 +1,11 @@
 use std::cell::Cell;
 use std::ptr;
-use std::sync::atomic::{fence, AtomicPtr, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering, fence};
 
 use crate::alloc;
 use crate::consume::CONSUME;
-use crate::countedindex::{past, CountedIndex, Index, Transaction};
-use crate::maybe_acquire::{maybe_acquire_fence, MAYBE_ACQUIRE};
+use crate::countedindex::{CountedIndex, Index, Transaction, past};
+use crate::maybe_acquire::{MAYBE_ACQUIRE, maybe_acquire_fence};
 use crate::memory::MemoryManager;
 
 #[derive(Clone, Copy, PartialEq)]
@@ -143,18 +143,22 @@ impl ReaderGroup {
         let new_meta = alloc::allocate(1);
         let new_group = alloc::allocate(1);
         let new_pos = alloc::allocate(1);
-        ptr::write(
-            new_pos,
-            ReaderPos {
-                pos_data: CountedIndex::from_usize(raw, wrap),
-            },
-        );
-        ptr::write(
-            new_meta,
-            ReaderMeta {
-                num_consumers: AtomicUsize::new(1),
-            },
-        );
+        unsafe {
+            ptr::write(
+                new_pos,
+                ReaderPos {
+                    pos_data: CountedIndex::from_usize(raw, wrap),
+                },
+            )
+        };
+        unsafe {
+            ptr::write(
+                new_meta,
+                ReaderMeta {
+                    num_consumers: AtomicUsize::new(1),
+                },
+            )
+        };
         let new_reader = Reader {
             state: Cell::new(ReaderState::Single),
             pos: new_pos,
@@ -162,12 +166,14 @@ impl ReaderGroup {
         };
         let mut new_readers = self.readers.clone();
         new_readers.push(new_pos as *const ReaderPos);
-        ptr::write(
-            new_group,
-            ReaderGroup {
-                readers: new_readers,
-            },
-        );
+        unsafe {
+            ptr::write(
+                new_group,
+                ReaderGroup {
+                    readers: new_readers,
+                },
+            )
+        };
         (new_group, new_reader)
     }
 
@@ -175,12 +181,14 @@ impl ReaderGroup {
         let new_group = alloc::allocate(1);
         let mut new_readers = self.readers.clone();
         new_readers.retain(|pt| *pt != reader);
-        ptr::write(
-            new_group,
-            ReaderGroup {
-                readers: new_readers,
-            },
-        );
+        unsafe {
+            ptr::write(
+                new_group,
+                ReaderGroup {
+                    readers: new_readers,
+                },
+            )
+        };
         new_group
     }
 
