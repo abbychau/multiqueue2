@@ -100,7 +100,7 @@
 //! # Example: SPSC channel
 //!
 //! ```
-//! extern crate multiqueue2 as multiqueue;
+//! extern crate ferring as multiqueue;
 //!
 //! use std::thread;
 //!
@@ -131,7 +131,7 @@
 //! # Example: SPSC broadcasting
 //!
 //! ```
-//! extern crate multiqueue2 as multiqueue;
+//! extern crate ferring as multiqueue;
 //!
 //! use std::thread;
 //!
@@ -180,7 +180,7 @@
 //! # Example: SPMC broadcast
 //!
 //! ```
-//! extern crate multiqueue2 as multiqueue;
+//! extern crate ferring as multiqueue;
 //!
 //! use std::thread;
 //!
@@ -235,7 +235,7 @@
 //! # Example: Usage menagerie
 //!
 //! ```
-//! extern crate multiqueue2 as multiqueue;
+//! extern crate ferring as multiqueue;
 //!
 //! use std::thread;
 //!
@@ -301,7 +301,7 @@
 //! }
 //! ```
 
-#![cfg_attr(feature = "cargo-clippy", allow(clippy::inline_always))]
+#![cfg_attr(clippy, allow(clippy::inline_always))]
 
 mod alloc;
 mod atomicsignal;
@@ -316,12 +316,12 @@ mod read_cursor;
 pub mod wait;
 
 pub use crate::broadcast::{
-    broadcast_fut_queue, broadcast_fut_queue_with, broadcast_queue, broadcast_queue_with,
     BroadcastFutReceiver, BroadcastFutSender, BroadcastFutUniReceiver, BroadcastReceiver,
-    BroadcastSender, BroadcastUniReceiver,
+    BroadcastSender, BroadcastUniReceiver, broadcast_fut_queue, broadcast_fut_queue_with,
+    broadcast_queue, broadcast_queue_with,
 };
 
 pub use crate::mpmc::{
-    mpmc_fut_queue, mpmc_queue, mpmc_queue_with, MPMCFutReceiver, MPMCFutSender,
-    MPMCFutUniReceiver, MPMCReceiver, MPMCSender, MPMCUniReceiver,
+    MPMCFutReceiver, MPMCFutSender, MPMCFutUniReceiver, MPMCReceiver, MPMCSender, MPMCUniReceiver,
+    mpmc_fut_queue, mpmc_queue, mpmc_queue_with,
 };

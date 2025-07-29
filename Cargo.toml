@@ -1,6 +1,6 @@
 [package]
-name = "multiqueue2"
-version = "0.1.7"
+name = "ferring"
+version = "0.0.1"
 authors = ["Sam Schetterer <samschet@gmail.com>", "Abby Chau <i@abby.md>", "Erick Arce <erick.arce10@gmail.com>"]
 license = "MIT"
 description = "A fast mpmc broadcast queue"
@@ -17,7 +17,7 @@ futures = "0.3.31"
 smallvec = "1.15.1"
 parking_lot = "0.12.4"
 atomic_utilities = "0.5.0"
-tokio = { version = "1.47.0", features = ["macros", "rt", "time"] }
+tokio = { version = "1.47.0", features = ["macros", "rt", "rt-multi-thread", "time"] }
 
 [dev-dependencies]
 time = "0.3.41"

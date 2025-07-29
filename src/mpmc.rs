@@ -21,7 +21,7 @@ use std::task::{Context, Poll};
 /// ```
 /// use std::thread;
 ///
-/// let (send, recv) = multiqueue2::mpmc_queue(4);
+/// let (send, recv) = ferring::mpmc_queue(4);
 ///
 /// let mut handles = vec![];
 ///
@@ -127,14 +127,14 @@ impl<T> MPMCReceiver<T> {
     /// # Examples:
     ///
     /// ```
-    /// use multiqueue2::mpmc_queue;
+    /// use ferring::mpmc_queue;
     /// let (w, r) = mpmc_queue(10);
     /// w.try_send(1).unwrap();
     /// assert_eq!(1, r.try_recv().unwrap());
     /// ```
     ///
     /// ```
-    /// use multiqueue2::mpmc_queue;
+    /// use ferring::mpmc_queue;
     /// use std::thread;
     ///
     /// let (send, recv) = mpmc_queue(10);
@@ -173,14 +173,14 @@ impl<T> MPMCReceiver<T> {
     /// # Examples:
     ///
     /// ```
-    /// use multiqueue2::mpmc_queue;
+    /// use ferring::mpmc_queue;
     /// let (w, r) = mpmc_queue(10);
     /// w.try_send(1).unwrap();
     /// assert_eq!(1, r.recv().unwrap());
     /// ```
     ///
     /// ```
-    /// use multiqueue2::mpmc_queue;
+    /// use ferring::mpmc_queue;
     /// use std::thread;
     ///
     /// let (send, recv) = mpmc_queue(10);
@@ -214,7 +214,7 @@ impl<T> MPMCReceiver<T> {
     /// # Examples
     ///
     /// ```
-    /// use multiqueue2::mpmc_queue;
+    /// use ferring::mpmc_queue;
     /// let (writer, reader) = mpmc_queue(2);
     /// writer.try_send(1).expect("This will succeed since queue is empty");
     /// reader.try_recv().expect("This reader can read");
@@ -232,7 +232,7 @@ impl<T> MPMCReceiver<T> {
     /// # Example:
     ///
     /// ```
-    /// use multiqueue2::mpmc_queue;
+    /// use ferring::mpmc_queue;
     ///
     /// let (w, r) = mpmc_queue(10);
     /// w.try_send(1).unwrap();
@@ -263,7 +263,7 @@ impl<T> MPMCReceiver<T> {
     /// # Examples:
     ///
     /// ```
-    /// use multiqueue2::mpmc_queue;
+    /// use ferring::mpmc_queue;
     /// let (w, r) = mpmc_queue(2);
     /// for _ in 0 .. 3 {
     ///     w.try_send(1).unwrap();
@@ -295,7 +295,7 @@ impl<T> MPMCUniReceiver<T> {
     ///
     /// # Example
     /// ```
-    /// use multiqueue2::mpmc_queue;
+    /// use ferring::mpmc_queue;
     ///
     /// let (w, r) = mpmc_queue(10);
     /// let single_r = r.into_single().unwrap();
@@ -325,7 +325,7 @@ impl<T> MPMCUniReceiver<T> {
     ///
     /// # Example
     /// ```
-    /// use multiqueue2::mpmc_queue;
+    /// use ferring::mpmc_queue;
     ///
     /// let (w, r) = mpmc_queue(10);
     /// let single_r = r.into_single().unwrap();
@@ -353,7 +353,7 @@ impl<T> MPMCUniReceiver<T> {
     /// # Examples
     ///
     /// ```
-    /// use multiqueue2::mpmc_queue;
+    /// use ferring::mpmc_queue;
     /// let (writer, reader) = mpmc_queue(2);
     /// writer.try_send(1).expect("This will succeed since queue is empty");
     /// reader.try_recv().expect("This reader can read");
@@ -370,7 +370,7 @@ impl<T> MPMCUniReceiver<T> {
     /// # Example
     ///
     /// ```
-    /// use multiqueue2::mpmc_queue;
+    /// use ferring::mpmc_queue;
     ///
     /// let (w, r) = mpmc_queue(10);
     /// w.try_send(1).unwrap();
@@ -391,7 +391,7 @@ impl<T> MPMCUniReceiver<T> {
     /// # Examples:
     ///
     /// ```
-    /// use multiqueue2::mpmc_queue;
+    /// use ferring::mpmc_queue;
     /// let (w, r) = mpmc_queue(2);
     /// let sr = r.into_single().unwrap();
     /// w.try_send(1).unwrap();
@@ -412,7 +412,7 @@ impl<T> MPMCUniReceiver<T> {
     /// # Examples:
     ///
     /// ```
-    /// use multiqueue2::mpmc_queue;
+    /// use ferring::mpmc_queue;
     /// let (w, r) = mpmc_queue(2);
     /// let sr = r.into_single().unwrap();
     /// for _ in 0 .. 3 {
@@ -742,7 +742,7 @@ impl<'a, R, F: FnMut(&T) -> R, T: 'a> Iterator for MPMCUniRefIter<'a, R, F, T> {
 ///
 /// # Example
 /// ```
-/// use multiqueue2::mpmc_queue;
+/// use ferring::mpmc_queue;
 /// let (w, r) = mpmc_queue(10);
 /// w.try_send(10).unwrap();
 /// assert_eq!(10, r.try_recv().unwrap());

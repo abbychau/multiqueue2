@@ -6,8 +6,8 @@
 //! # Examples
 //!
 //! ```
-//! use multiqueue2::wait::*;
-//! use multiqueue2::broadcast_queue_with;
+//! use ferring::wait::*;
+//! use ferring::broadcast_queue_with;
 //! let _ = broadcast_queue_with::<usize, BusyWait>(10, BusyWait::new());
 //! let _ = broadcast_queue_with::<usize, YieldingWait>(10, YieldingWait::new());
 //! let _ = broadcast_queue_with::<usize, BlockingWait>(10, BlockingWait::new());
@@ -223,7 +223,7 @@ impl Clone for BlockingWait {
 #[cfg(test)]
 mod test {
 
-    use std::sync::atomic::{fence, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicUsize, Ordering, fence};
     use std::thread::yield_now;
 
     use super::*;
@@ -312,5 +312,4 @@ mod test {
     fn test_blockingwait_nospin() {
         test_waiter(BlockingWait::with_spins(0, 0));
     }
-
 }

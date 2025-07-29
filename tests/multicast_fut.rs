@@ -1,6 +1,6 @@
 // For the most part, shamelessly copied from carllerche futures mpsc tests
+extern crate ferring as multiqueue;
 extern crate futures;
-extern crate multiqueue2 as multiqueue;
 
 use futures::future::lazy;
 use futures::{SinkExt, StreamExt};
@@ -101,7 +101,7 @@ async fn tx_close_gets_none() {
     .unwrap();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn stress_shared_bounded_hard() {
     const AMT: u32 = 10000;
     const NTHREADS: u32 = 8;
@@ -132,7 +132,7 @@ async fn stress_shared_bounded_hard() {
     t.await.unwrap();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn stress_receiver_multi_task_bounded_hard() {
     const AMT: usize = 10_000;
     const NTHREADS: u32 = 2;
@@ -159,7 +159,7 @@ async fn stress_receiver_multi_task_bounded_hard() {
                 };
 
                 match rcv_rx {
-                    Some(rcv_rx) => {
+                    Some(mut rcv_rx) => {
                         if i % 5 == 0 {
                             let (item, rest) = rcv_rx.into_future().await;
 
@@ -176,9 +176,9 @@ async fn stress_receiver_multi_task_bounded_hard() {
                             // Just poll
                             let n = n.clone();
                             let rx = Arc::clone(&rx);
-                            let r = lazy(move |_| {
-                                let r = match rcv_rx.try_recv() {
-                                    Ok(_) => {
+                            let r = lazy(move |_| async move {
+                                let r = match rcv_rx.next().await {
+                                    Some(_) => {
                                         n.fetch_add(1, Ordering::Relaxed);
                                         {
                                             let mut lock = rx.lock().ok().unwrap();
@@ -186,8 +186,7 @@ async fn stress_receiver_multi_task_bounded_hard() {
                                         }
                                         false
                                     }
-                                    Err(TryRecvError::Empty) => true,
-                                    Err(TryRecvError::Disconnected) => {
+                                    None => {
                                         {
                                             let mut lock = rx.lock().ok().unwrap();
                                             *lock = Some(rcv_rx);
@@ -198,6 +197,7 @@ async fn stress_receiver_multi_task_bounded_hard() {
 
                                 Ok::<bool, ()>(r)
                             })
+                            .await
                             .await
                             .unwrap();
 

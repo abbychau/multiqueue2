@@ -1,7 +1,7 @@
-use multiqueue2 as multiqueue;
+use ferring as multiqueue;
 
 use crossbeam::scope;
-use self::multiqueue::broadcast_queue;
+use multiqueue::broadcast_queue;
 
 fn spsc_example() {
     let (send, recv) = broadcast_queue(4);

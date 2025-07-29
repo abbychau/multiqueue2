@@ -1,14 +1,14 @@
-use multiqueue2 as multiqueue;
+use ferring as multiqueue;
 
 use crossbeam::scope;
 use time::OffsetDateTime;
 
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Barrier;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use crate::multiqueue::{broadcast_queue_with, wait, BroadcastReceiver, BroadcastSender};
+use crate::multiqueue::{BroadcastReceiver, BroadcastSender, broadcast_queue_with, wait};
 
-fn precise_time_ns() -> u32{
+fn precise_time_ns() -> u32 {
     OffsetDateTime::now_utc().nanosecond() - OffsetDateTime::UNIX_EPOCH.nanosecond()
 }
 
