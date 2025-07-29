@@ -5,11 +5,11 @@
 
 Ferring is a fast bounded mpmc queue that supports broadcast/broadcast style operations
 
-[MultiQueue](https://github.com/schets/multiqueue) was developed by Sam Schetterer, but not updated for some time. I found it very useful as it implements `futures`. However, it is with a few outdated library API and the use of spin locks is taking 100% CPU in many cases.
+[multiqueue](https://github.com/schets/multiqueue) was developed by Sam Schetterer, updated and maintained for some time by Abby Chau [multiqueue2](https://github.com/abbychau/multiqueue2), but not updated since about 2020. This version has brought all dependencies and toolchain versions up to the latest.
 
-## What's new in Ferring
+## What was new in multiqueue2
 
-This version tries to fix these. By default, it is now using a condvar block. For `_fut_` async channels, all items are parked quickly without initial spin locks.
+By default, it is uses a condvar block. For `_fut_` async channels, all items are parked quickly without initial spin locks.
 
 The use of this queue is virtually lockless but technically and strictly speaking not.
 There are three kinds of lock:
@@ -326,7 +326,7 @@ You can use the MPMC portions of the queue, but you can't broadcast anything
 It's sensible for a reader to block if there is truly nothing for it to do, while the equivalent
 isn't true for senders.
 
-If a sender blocks, that means that the system is backlogged and something else has to consure the stacked up items.
+If a sender blocks, that means that the system is backlogged and something else has to consume the stacked up items.
 
 Furthermore, it puts more of a performance penalty on the queue and the latency hit for notifying senders comes before the queue action is finished, while notifying readers happens after the value has sent.
 
