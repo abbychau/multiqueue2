@@ -4,16 +4,19 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
-use std::sync::atomic::Ordering::*;
-use std::sync::atomic::{fence, AtomicUsize};
-use std::sync::mpsc::{RecvError, SendError, TryRecvError, TrySendError};
 use std::sync::Arc;
+use std::sync::atomic::Ordering::*;
+use std::sync::atomic::{AtomicUsize, fence};
+use std::sync::mpsc::{RecvError, SendError, TryRecvError, TrySendError};
+use std::task::Waker;
 use std::thread::yield_now;
+
+use futures::StreamExt;
 
 use crate::alloc;
 use crate::atomicsignal::LoadedSignal;
 use crate::countedindex::{
-    get_valid_wrap, is_tagged, rm_tag, CountedIndex, Index, INITIAL_QUEUE_FLAG,
+    CountedIndex, INITIAL_QUEUE_FLAG, Index, get_valid_wrap, is_tagged, rm_tag,
 };
 use crate::memory::{MemToken, MemoryManager};
 use crate::wait::*;
@@ -25,10 +28,10 @@ extern crate futures;
 extern crate parking_lot;
 extern crate smallvec;
 
-use self::futures::task::{current, Task};
-use self::futures::{Async, AsyncSink, Poll, Sink, StartSend, Stream};
+use self::futures::{Sink, Stream};
+use std::task::{Context, Poll};
 
-use self::atomic_utilities::artificial_dep::{dependently_mut, DepOrd};
+use self::atomic_utilities::artificial_dep::{DepOrd, dependently_mut};
 
 /// This is basically acting as a static bool
 /// so the queue can act as a normal mpmc in other circumstances
@@ -107,7 +110,7 @@ impl<T> QueueRW<T> for MPMC<T> {
 
     #[inline(always)]
     unsafe fn get_val(val: &mut T) -> T {
-        ptr::read(val)
+        unsafe { ptr::read(val) }
     }
 
     #[inline(always)]
@@ -117,7 +120,7 @@ impl<T> QueueRW<T> for MPMC<T> {
 
     #[inline(always)]
     unsafe fn drop_in_place(val: &mut T) {
-        ptr::drop_in_place(val);
+        unsafe { ptr::drop_in_place(val) };
     }
 }
 
@@ -187,6 +190,7 @@ pub struct FutInnerSend<RW: QueueRW<T>, T> {
     writer: InnerSend<RW, T>,
     wait: Arc<FutWait>,
     prod_wait: Arc<FutWait>,
+    buffered_msg: Option<T>,
 }
 
 /// This is a receiver that can transparently act as a futures stream
@@ -206,7 +210,7 @@ pub struct FutInnerUniRecv<RW: QueueRW<T>, R, F: FnMut(&T) -> R, T> {
 struct FutWait {
     spins_first: usize,
     spins_yield: usize,
-    parked: parking_lot::Mutex<VecDeque<Task>>,
+    parked: parking_lot::Mutex<VecDeque<std::task::Waker>>,
 }
 
 impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
@@ -238,12 +242,12 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
         let (cursor, reader) = ReadCursor::new(capacity);
         let needs_notify = wait.needs_notify();
         let queue = MultiQueue {
-            d1: unsafe { mem::MaybeUninit::uninit().assume_init() },
+            d1: [0u8; 64],
 
             head: CountedIndex::new(capacity),
             tail_cache: AtomicUsize::new(0),
             writers: AtomicUsize::new(1),
-            d2: unsafe { mem::MaybeUninit::uninit().assume_init() },
+            d2: [0u8; 64],
 
             tail: cursor,
             data: queuedat,
@@ -252,11 +256,11 @@ impl<RW: QueueRW<T>, T> MultiQueue<RW, T> {
             waiter: wait,
             needs_notify,
             mk: PhantomData,
-            d3: unsafe { mem::MaybeUninit::uninit().assume_init() },
+            d3: [0u8; 64],
 
             manager: MemoryManager::new(),
 
-            d4: unsafe { mem::MaybeUninit::uninit().assume_init() },
+            d4: [0u8; 64],
         };
 
         let qarc = Arc::new(queue);
@@ -732,68 +736,100 @@ impl<RW: QueueRW<T>, R, F: FnMut(&T) -> R, T> FutInnerUniRecv<RW, R, F, T> {
 
 //////// Fut stream/sink implementations
 
-impl<RW: QueueRW<T>, T> Sink for &FutInnerSend<RW, T> {
-    type SinkItem = T;
-    type SinkError = SendError<T>;
+impl<RW: QueueRW<T>, T: Unpin> Sink<T> for FutInnerSend<RW, T> {
+    type Error = SendError<T>;
+
+    #[inline(always)]
+    fn poll_ready(
+        self: std::pin::Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        let this = self.get_mut();
+
+        // If we've buffered a message, we must flush first.
+        if this.buffered_msg.is_some() {
+            Poll::Pending
+        } else {
+            Poll::Ready(Ok(()))
+        }
+    }
 
     /// Essentially try_send except parks if the queue is full
-    fn start_send(&mut self, msg: T) -> StartSend<T, SendError<T>> {
-        match self
-            .prod_wait
-            .send_or_park(|m| self.writer.try_send(m), msg)
-        {
-            Ok(_) => {
-                // see InnerSend::try_recv for why this isn't in the queue
-                if self.writer.queue.needs_notify {
-                    self.writer.queue.waiter.notify();
+    #[inline(always)]
+    fn start_send(self: std::pin::Pin<&mut Self>, msg: T) -> Result<(), Self::Error> {
+        let this = self.get_mut();
+
+        if this.buffered_msg.is_some() {
+            panic!("start_send called without poll_ready (buffer full)");
+        }
+        this.buffered_msg = Some(msg);
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        let this = self.get_mut();
+
+        if let Some(msg) = this.buffered_msg.take() {
+            match this.prod_wait.poll_send_or_park(
+                |m| this.writer.try_send(m),
+                msg,
+                cx.waker().clone(),
+            ) {
+                Ok(()) => {
+                    if this.writer.queue.needs_notify {
+                        this.writer.queue.waiter.notify();
+                    }
+                    Poll::Ready(Ok(()))
                 }
-                Ok(AsyncSink::Ready)
+                Err(TrySendError::Full(m)) => {
+                    this.buffered_msg = Some(m); // back in the buffer
+                    Poll::Pending
+                }
+                Err(TrySendError::Disconnected(m)) => Poll::Ready(Err(SendError(m))),
             }
-            Err(TrySendError::Full(msg)) => Ok(AsyncSink::NotReady(msg)),
-            Err(TrySendError::Disconnected(msg)) => Err(SendError(msg)),
+        } else {
+            Poll::Ready(Ok(()))
         }
     }
 
     #[inline(always)]
-    fn poll_complete(&mut self) -> Poll<(), SendError<T>> {
-        Ok(Async::Ready(()))
-    }
-}
-
-impl<RW: QueueRW<T>, T> Sink for FutInnerSend<RW, T> {
-    type SinkItem = T;
-    type SinkError = SendError<T>;
-
-    #[inline(always)]
-    fn start_send(&mut self, msg: T) -> StartSend<T, SendError<T>> {
-        (&*self).start_send(msg)
-    }
-
-    #[inline(always)]
-    fn poll_complete(&mut self) -> Poll<(), SendError<T>> {
-        (&*self).poll_complete()
+    fn poll_close(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        self.poll_flush(cx)
     }
 }
 
 impl<RW: QueueRW<T>, T> Stream for &FutInnerRecv<RW, T> {
     type Item = T;
-    type Error = ();
 
     /// Essentially the same as recv
     #[inline]
-    fn poll(&mut self) -> Poll<Option<T>, ()> {
+    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
         self.reader.examine_signals();
         loop {
             match self.reader.queue.try_recv(&self.reader.reader) {
                 Ok(msg) => {
                     self.prod_wait.notify_all();
-                    return Ok(Async::Ready(Some(msg)));
+                    return Poll::Ready(Some(msg));
                 }
-                Err((_, TryRecvError::Disconnected)) => return Ok(Async::Ready(None)),
+                Err((_, TryRecvError::Disconnected)) => return Poll::Ready(None),
                 Err((pt, _)) => {
                     let count = self.reader.reader.load_count(Relaxed);
-                    if unsafe { self.wait.fut_wait(count, &*pt, &self.reader.queue.writers) } {
-                        return Ok(Async::NotReady);
+                    if unsafe {
+                        self.wait.fut_wait(
+                            count,
+                            &*pt,
+                            &self.reader.queue.writers,
+                            cx.waker().clone(),
+                        )
+                    } {
+                        return Poll::Pending;
                     }
                 }
             }
@@ -803,33 +839,40 @@ impl<RW: QueueRW<T>, T> Stream for &FutInnerRecv<RW, T> {
 
 impl<RW: QueueRW<T>, T> Stream for FutInnerRecv<RW, T> {
     type Item = T;
-    type Error = ();
 
     #[inline(always)]
-    fn poll(&mut self) -> Poll<Option<T>, ()> {
-        (&*self).poll()
+    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        self.get_mut().poll_next_unpin(cx)
     }
 }
 
-impl<RW: QueueRW<T>, R, F: for<'r> FnMut(&T) -> R, T> Stream for FutInnerUniRecv<RW, R, F, T> {
+impl<RW: QueueRW<T>, R, F: for<'r> FnMut(&T) -> R + Clone, T> Stream
+    for FutInnerUniRecv<RW, R, F, T>
+{
     type Item = R;
-    type Error = ();
 
     #[inline]
-    fn poll(&mut self) -> Poll<Option<R>, ()> {
+    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<R>> {
         self.reader.examine_signals();
         loop {
-            let opref = &mut self.op;
+            let opref = self.op.clone();
             match self.reader.queue.try_recv_view(opref, &self.reader.reader) {
                 Ok(msg) => {
                     self.prod_wait.notify_all();
-                    return Ok(Async::Ready(Some(msg)));
+                    return Poll::Ready(Some(msg));
                 }
-                Err((_, _, TryRecvError::Disconnected)) => return Ok(Async::Ready(None)),
+                Err((_, _, TryRecvError::Disconnected)) => return Poll::Ready(None),
                 Err((_, pt, _)) => {
                     let count = self.reader.reader.load_count(Relaxed);
-                    if unsafe { self.wait.fut_wait(count, &*pt, &self.reader.queue.writers) } {
-                        return Ok(Async::NotReady);
+                    if unsafe {
+                        self.wait.fut_wait(
+                            count,
+                            &*pt,
+                            &self.reader.queue.writers,
+                            cx.waker().clone(),
+                        )
+                    } {
+                        return Poll::Pending;
                     }
                 }
             }
@@ -852,9 +895,10 @@ impl FutWait {
         }
     }
 
-    pub fn fut_wait(&self, seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
-        if self.spin(seq, at, wc) && self.park(seq, at, wc) {
-            ::std::thread::sleep(::std::time::Duration::from_millis(100));
+    pub fn fut_wait(&self, seq: usize, at: &AtomicUsize, wc: &AtomicUsize, waker: Waker) -> bool {
+        if self.spin(seq, at, wc) && self.park(seq, at, wc, waker) {
+            // ::std::thread::sleep(::std::time::Duration::from_millis(100));
+
             true
         } else {
             false
@@ -877,19 +921,20 @@ impl FutWait {
         true
     }
 
-    pub fn park(&self, seq: usize, at: &AtomicUsize, wc: &AtomicUsize) -> bool {
+    pub fn park(&self, seq: usize, at: &AtomicUsize, wc: &AtomicUsize, waker: Waker) -> bool {
         let mut parked = self.parked.lock();
         if check(seq, at, wc) {
             return false;
         }
-        parked.push_back(current());
+        parked.push_back(waker);
         true
     }
 
-    fn send_or_park<T, F: Fn(T) -> Result<(), TrySendError<T>>>(
+    fn poll_send_or_park<T, F: Fn(T) -> Result<(), TrySendError<T>>>(
         &self,
         f: F,
         mut val: T,
+        waker: Waker,
     ) -> Result<(), TrySendError<T>> {
         for _ in 0..self.spins_first {
             match f(val) {
@@ -909,7 +954,7 @@ impl FutWait {
         let mut parked = self.parked.lock();
         match f(val) {
             Err(TrySendError::Full(v)) => {
-                parked.push_back(current());
+                parked.push_back(waker);
                 Err(TrySendError::Full(v))
             }
             v => v,
@@ -919,7 +964,7 @@ impl FutWait {
     fn notify_all(&self) {
         let mut parked = self.parked.lock();
         for val in parked.drain(..) {
-            val.notify();
+            val.wake_by_ref();
         }
     }
 }
@@ -935,14 +980,14 @@ impl Wait for FutWait {
         if parked.len() > 0 {
             if parked.len() > 8 {
                 for val in parked.drain(..) {
-                    val.notify();
+                    val.wake_by_ref();
                 }
             } else {
-                let mut inline_v = smallvec::SmallVec::<[Task; 9]>::new();
+                let mut inline_v = smallvec::SmallVec::<[Waker; 9]>::new();
                 inline_v.extend(parked.drain(..));
                 drop(parked);
                 for val in inline_v.drain(..) {
-                    val.notify();
+                    val.wake_by_ref();
                 }
             }
         }
@@ -980,12 +1025,13 @@ impl<RW: QueueRW<T>, T> Clone for InnerRecv<RW, T> {
     }
 }
 
-impl<RW: QueueRW<T>, T> Clone for FutInnerSend<RW, T> {
+impl<RW: QueueRW<T>, T: Clone> Clone for FutInnerSend<RW, T> {
     fn clone(&self) -> FutInnerSend<RW, T> {
         FutInnerSend {
             writer: self.writer.clone(),
             wait: self.wait.clone(),
             prod_wait: self.prod_wait.clone(),
+            buffered_msg: self.buffered_msg.clone(),
         }
     }
 }
@@ -1112,6 +1158,7 @@ pub fn futures_multiqueue<RW: QueueRW<T>, T>(
         writer: tx,
         wait: cons_arc.clone(),
         prod_wait: prod_arc.clone(),
+        buffered_msg: None,
     };
     let rtx = FutInnerRecv {
         reader: rx,
@@ -1140,6 +1187,7 @@ pub fn futures_multiqueue_with<RW: QueueRW<T>, T>(
         writer: tx,
         wait: cons_arc.clone(),
         prod_wait: prod_arc.clone(),
+        buffered_msg: None,
     };
     let rtx = FutInnerRecv {
         reader: rx,

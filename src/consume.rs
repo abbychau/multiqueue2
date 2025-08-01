@@ -4,8 +4,8 @@ use std::sync::atomic::Ordering;
 // This project uses it exclusively for things like b = *a, c = *b
 
 #[cfg(any(
-    target_arch = "x64",
-    target_arch = "x64_64",
+    target_arch = "x86",
+    target_arch = "x86_64",
     target_arch = "aarch64",
     target_arch = "arm"
 ))]
@@ -15,8 +15,8 @@ mod can_consume {
 }
 
 #[cfg(not(any(
-    target_arch = "x64",
-    target_arch = "x64_64",
+    target_arch = "x86",
+    target_arch = "x86_64",
     target_arch = "aarch64",
     target_arch = "arm"
 )))]

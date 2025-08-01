@@ -223,7 +223,7 @@ impl Clone for BlockingWait {
 #[cfg(test)]
 mod test {
 
-    use std::sync::atomic::{fence, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicUsize, Ordering, fence};
     use std::thread::yield_now;
 
     use super::*;
@@ -312,5 +312,4 @@ mod test {
     fn test_blockingwait_nospin() {
         test_waiter(BlockingWait::with_spins(0, 0));
     }
-
 }

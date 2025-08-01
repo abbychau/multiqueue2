@@ -1,0 +1,7 @@
+[output]
+html = true
+csv = true
+json = true
+
+[plots]
+enabled = true

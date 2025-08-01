@@ -1,11 +1,11 @@
 use std::mem;
 use std::ptr;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::alloc;
 use crate::atomicsignal::AtomicSignal;
-use crate::maybe_acquire::{maybe_acquire_fence, MAYBE_ACQUIRE};
+use crate::maybe_acquire::{MAYBE_ACQUIRE, maybe_acquire_fence};
 
 struct ToFree {
     mem: *mut u8,
@@ -36,7 +36,7 @@ impl ToFree {
         unsafe fn do_free<F>(pt: *mut u8, num: usize) {
             let to_free: *mut F = pt as *mut F;
             for i in 0..num as isize {
-                ptr::read(to_free.offset(i));
+                unsafe { ptr::read(to_free.offset(i)) };
             }
             alloc::deallocate(to_free, num);
         }

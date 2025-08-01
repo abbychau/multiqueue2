@@ -1,14 +1,15 @@
 use crate::countedindex::Index;
 use crate::multiqueue::{
-    futures_multiqueue, FutInnerRecv, FutInnerSend, FutInnerUniRecv, InnerRecv, InnerSend,
-    MultiQueue, MPMC,
+    FutInnerRecv, FutInnerSend, FutInnerUniRecv, InnerRecv, InnerSend, MPMC, MultiQueue,
+    futures_multiqueue,
 };
 use crate::wait::Wait;
 
 use std::sync::mpsc::{RecvError, SendError, TryRecvError, TrySendError};
 
 extern crate futures;
-use self::futures::{Async, Poll, Sink, StartSend, Stream};
+use self::futures::{Sink, SinkExt, Stream, StreamExt};
+use std::task::{Context, Poll};
 
 /// This class is the sending half of the mpmc ```MultiQueue```. It supports both
 /// single and multi consumer modes with competitive performance in each case.
@@ -88,7 +89,7 @@ pub struct MPMCUniReceiver<T> {
 
 /// This is the futures-compatible version of ```MPMCSender```
 /// It implements Sink
-pub struct MPMCFutSender<T> {
+pub struct MPMCFutSender<T: Clone> {
     sender: FutInnerSend<MPMC<T>, T>,
 }
 
@@ -427,7 +428,7 @@ impl<T> MPMCUniReceiver<T> {
     }
 }
 
-impl<T> MPMCFutSender<T> {
+impl<T: Clone> MPMCFutSender<T> {
     /// Equivalent to ```MPMCSender::try_send```
     #[inline(always)]
     pub fn try_send(&self, val: T) -> Result<(), TrySendError<T>> {
@@ -520,7 +521,7 @@ impl<R, F: FnMut(&T) -> R, T> MPMCFutUniReceiver<R, F, T> {
     }
 }
 
-impl<T> Clone for MPMCFutSender<T> {
+impl<T: Clone> Clone for MPMCFutSender<T> {
     fn clone(&self) -> Self {
         MPMCFutSender {
             sender: self.sender.clone(),
@@ -528,33 +529,36 @@ impl<T> Clone for MPMCFutSender<T> {
     }
 }
 
-impl<T> Sink for &MPMCFutSender<T> {
-    type SinkItem = T;
-    type SinkError = SendError<T>;
+impl<T: Clone + Unpin> Sink<T> for MPMCFutSender<T> {
+    type Error = SendError<T>;
 
     #[inline(always)]
-    fn start_send(&mut self, msg: T) -> StartSend<T, SendError<T>> {
-        (&self.sender).start_send(msg)
+    fn poll_ready(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        self.get_mut().sender.poll_ready_unpin(cx)
     }
 
     #[inline(always)]
-    fn poll_complete(&mut self) -> Poll<(), SendError<T>> {
-        Ok(Async::Ready(()))
-    }
-}
-
-impl<T> Sink for MPMCFutSender<T> {
-    type SinkItem = T;
-    type SinkError = SendError<T>;
-
-    #[inline(always)]
-    fn start_send(&mut self, msg: T) -> StartSend<T, SendError<T>> {
-        (&*self).start_send(msg)
+    fn start_send(self: std::pin::Pin<&mut Self>, msg: T) -> Result<(), Self::Error> {
+        self.get_mut().sender.start_send_unpin(msg)
     }
 
     #[inline(always)]
-    fn poll_complete(&mut self) -> Poll<(), SendError<T>> {
-        (&*self).poll_complete()
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        self.get_mut().sender.poll_flush_unpin(cx)
+    }
+
+    #[inline(always)]
+    fn poll_close(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<(), Self::Error>> {
+        self.get_mut().sender.poll_close_unpin(cx)
     }
 }
 
@@ -568,31 +572,28 @@ impl<T> Clone for MPMCFutReceiver<T> {
 
 impl<T> Stream for &MPMCFutReceiver<T> {
     type Item = T;
-    type Error = ();
 
     #[inline(always)]
-    fn poll(&mut self) -> Poll<Option<T>, ()> {
-        (&self.receiver).poll()
+    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        (&self.receiver).poll_next_unpin(cx)
     }
 }
 
 impl<T> Stream for MPMCFutReceiver<T> {
     type Item = T;
-    type Error = ();
 
     #[inline(always)]
-    fn poll(&mut self) -> Poll<Option<T>, ()> {
-        (&*self).poll()
+    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        (&*self).poll_next_unpin(cx)
     }
 }
 
-impl<R, F: FnMut(&T) -> R, T> Stream for MPMCFutUniReceiver<R, F, T> {
+impl<R, F: FnMut(&T) -> R + Clone + Unpin, T> Stream for MPMCFutUniReceiver<R, F, T> {
     type Item = R;
-    type Error = ();
 
     #[inline(always)]
-    fn poll(&mut self) -> Poll<Option<R>, ()> {
-        self.receiver.poll()
+    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.get_mut().receiver.poll_next_unpin(cx)
     }
 }
 
@@ -762,7 +763,7 @@ pub fn mpmc_queue_with<T, W: Wait + 'static>(
 
 /// Futures variant of ```mpmc_queue``` - datastructures implement
 /// Sink + Stream at a minor (~30 ns) performance cost to ```BlockingWait```
-pub fn mpmc_fut_queue<T>(capacity: Index) -> (MPMCFutSender<T>, MPMCFutReceiver<T>) {
+pub fn mpmc_fut_queue<T: Clone>(capacity: Index) -> (MPMCFutSender<T>, MPMCFutReceiver<T>) {
     let (isend, irecv) = futures_multiqueue::<MPMC<T>, T>(capacity);
     (
         MPMCFutSender { sender: isend },
