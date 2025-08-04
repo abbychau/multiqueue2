@@ -1,0 +1,21 @@
+title: MultiQueue2
+description: Fast MPMC broadcast queue implementation in Rust
+theme: jekyll-theme-minimal
+markdown: kramdown
+highlighter: rouge
+
+plugins:
+  - jekyll-optional-front-matter
+
+repository: abbychau/multiqueue2
+
+# Navigation
+nav:
+  - name: "Home"
+    link: "/"
+  - name: "Benchmarks"
+    link: "/benchmarks/"
+  - name: "API Docs"
+    link: "https://docs.rs/multiqueue2"
+  - name: "GitHub"
+    link: "https://github.com/abbychau/multiqueue2"
