@@ -733,10 +733,7 @@ impl<T: Clone> Iterator for BroadcastIter<T> {
 
     #[inline(always)]
     fn next(&mut self) -> Option<T> {
-        match self.recv.recv() {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        }
+        self.recv.recv().ok()
     }
 }
 
@@ -759,10 +756,7 @@ impl<T: Clone + Sync> Iterator for BroadcastSCIter<T> {
 
     #[inline(always)]
     fn next(&mut self) -> Option<T> {
-        match self.recv.recv() {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        }
+        self.recv.recv().ok()
     }
 }
 
@@ -785,10 +779,7 @@ impl<'a, T: Clone + 'a> Iterator for BroadcastRefIter<'a, T> {
 
     #[inline(always)]
     fn next(&mut self) -> Option<T> {
-        match self.recv.try_recv() {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        }
+        self.recv.try_recv().ok()
     }
 }
 
@@ -811,10 +802,7 @@ impl<'a, T: Clone + Sync + 'a> Iterator for BroadcastSCRefIter<'a, T> {
 
     #[inline(always)]
     fn next(&mut self) -> Option<T> {
-        match self.recv.try_recv() {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        }
+        self.recv.try_recv().ok()
     }
 }
 
@@ -839,10 +827,7 @@ impl<R, F: FnMut(&T) -> R, T: Clone + Sync> Iterator for BroadcastUniIter<R, F, 
     #[inline(always)]
     fn next(&mut self) -> Option<R> {
         let opref = &mut self.op;
-        match self.recv.recv_view(|v| opref(v)) {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        }
+        self.recv.recv_view(|v| opref(v)).ok()
     }
 }
 
@@ -857,10 +842,7 @@ impl<'a, R, F: FnMut(&T) -> R, T: Clone + Sync + 'a> Iterator for BroadcastUniRe
     #[inline(always)]
     fn next(&mut self) -> Option<R> {
         let opref = &mut self.op;
-        match self.recv.try_recv_view(|v| opref(v)) {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        }
+        self.recv.try_recv_view(|v| opref(v)).ok()
     }
 }
 
@@ -893,7 +875,6 @@ pub fn broadcast_queue<T: Clone>(capacity: Index) -> (BroadcastSender<T>, Broadc
 /// w.try_send(10).unwrap();
 /// assert_eq!(10, r.try_recv().unwrap());
 /// ```
-
 pub fn broadcast_queue_with<T: Clone, W: Wait + 'static>(
     capacity: Index,
     wait: W,

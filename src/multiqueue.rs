@@ -87,11 +87,11 @@ impl<T: Clone> QueueRW<T> for BCast<T> {
 }
 
 #[derive(Clone)]
-pub struct MPMC<T> {
+pub struct Mpmc<T> {
     mk: PhantomData<T>,
 }
 
-impl<T> QueueRW<T> for MPMC<T> {
+impl<T> QueueRW<T> for Mpmc<T> {
     #[inline(always)]
     fn inc_ref(_r: &AtomicUsize) {}
 
@@ -977,7 +977,7 @@ impl Wait for FutWait {
 
     fn notify(&self) {
         let mut parked = self.parked.lock();
-        if parked.len() > 0 {
+        if !parked.is_empty() {
             if parked.len() > 8 {
                 for val in parked.drain(..) {
                     val.wake_by_ref();

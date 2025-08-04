@@ -1,6 +1,6 @@
 use crate::countedindex::Index;
 use crate::multiqueue::{
-    FutInnerRecv, FutInnerSend, FutInnerUniRecv, InnerRecv, InnerSend, MPMC, MultiQueue,
+    FutInnerRecv, FutInnerSend, FutInnerUniRecv, InnerRecv, InnerSend, Mpmc, MultiQueue,
     futures_multiqueue,
 };
 use crate::wait::Wait;
@@ -60,7 +60,7 @@ use std::task::{Context, Poll};
 /// ```
 #[derive(Clone)]
 pub struct MPMCSender<T> {
-    sender: InnerSend<MPMC<T>, T>,
+    sender: InnerSend<Mpmc<T>, T>,
 }
 
 /// This is the receiving end of a standard mpmc view of the queue
@@ -68,7 +68,7 @@ pub struct MPMCSender<T> {
 /// is only ever one stream. As a result, the type doesn't need to be clone
 #[derive(Debug)]
 pub struct MPMCReceiver<T> {
-    receiver: InnerRecv<MPMC<T>, T>,
+    receiver: InnerRecv<Mpmc<T>, T>,
 }
 
 impl<T> Clone for MPMCReceiver<T> {
@@ -84,19 +84,19 @@ impl<T> Clone for MPMCReceiver<T> {
 /// It functions similarly to the ```BroadcastUniReceiver``` execpt there
 /// is only ever one stream. As a result, the type doesn't need to be clone or sync
 pub struct MPMCUniReceiver<T> {
-    receiver: InnerRecv<MPMC<T>, T>,
+    receiver: InnerRecv<Mpmc<T>, T>,
 }
 
 /// This is the futures-compatible version of ```MPMCSender```
 /// It implements Sink
 pub struct MPMCFutSender<T: Clone> {
-    sender: FutInnerSend<MPMC<T>, T>,
+    sender: FutInnerSend<Mpmc<T>, T>,
 }
 
 /// This is the futures-compatible version of ```MPMCReceiver```
 /// It implements Stream
 pub struct MPMCFutReceiver<T> {
-    receiver: FutInnerRecv<MPMC<T>, T>,
+    receiver: FutInnerRecv<Mpmc<T>, T>,
 }
 
 /// This is the futures-compatible version of ```MPMCUniReceiver```
@@ -104,7 +104,7 @@ pub struct MPMCFutReceiver<T> {
 /// To use a different function must transform itself into a different
 /// UniRecveiver use ```transform_operation```
 pub struct MPMCFutUniReceiver<R, F: FnMut(&T) -> R, T> {
-    receiver: FutInnerUniRecv<MPMC<T>, R, F, T>,
+    receiver: FutInnerUniRecv<Mpmc<T>, R, F, T>,
 }
 
 impl<T> MPMCSender<T> {
@@ -606,10 +606,7 @@ impl<T> Iterator for MPMCIter<T> {
 
     #[inline(always)]
     fn next(&mut self) -> Option<T> {
-        match self.recv.recv() {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        }
+        self.recv.recv().ok()
     }
 }
 
@@ -632,10 +629,7 @@ impl<T> Iterator for MPSCIter<T> {
 
     #[inline(always)]
     fn next(&mut self) -> Option<T> {
-        match self.recv.recv() {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        }
+        self.recv.recv().ok()
     }
 }
 
@@ -658,10 +652,7 @@ impl<'a, T> Iterator for MPMCRefIter<'a, T> {
 
     #[inline(always)]
     fn next(&mut self) -> Option<T> {
-        match self.recv.try_recv() {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        }
+        self.recv.try_recv().ok()
     }
 }
 
@@ -684,10 +675,7 @@ impl<'a, T> Iterator for MPSCRefIter<'a, T> {
 
     #[inline(always)]
     fn next(&mut self) -> Option<T> {
-        match self.recv.try_recv() {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        }
+        self.recv.try_recv().ok()
     }
 }
 
@@ -712,10 +700,7 @@ impl<R, F: FnMut(&T) -> R, T> Iterator for MPMCUniIter<R, F, T> {
     #[inline(always)]
     fn next(&mut self) -> Option<R> {
         let opref = &mut self.op;
-        match self.recv.recv_view(|v| opref(v)) {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        }
+        self.recv.recv_view(|v| opref(v)).ok()
     }
 }
 
@@ -730,10 +715,7 @@ impl<'a, R, F: FnMut(&T) -> R, T: 'a> Iterator for MPMCUniRefIter<'a, R, F, T> {
     #[inline(always)]
     fn next(&mut self) -> Option<R> {
         let opref = &mut self.op;
-        match self.recv.try_recv_view(|v| opref(v)) {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        }
+        self.recv.try_recv_view(|v| opref(v)).ok()
     }
 }
 
@@ -747,9 +729,8 @@ impl<'a, R, F: FnMut(&T) -> R, T: 'a> Iterator for MPMCUniRefIter<'a, R, F, T> {
 /// w.try_send(10).unwrap();
 /// assert_eq!(10, r.try_recv().unwrap());
 /// ```
-
 pub fn mpmc_queue<T>(capacity: Index) -> (MPMCSender<T>, MPMCReceiver<T>) {
-    let (send, recv) = MultiQueue::<MPMC<T>, T>::create_tx_rx(capacity);
+    let (send, recv) = MultiQueue::<Mpmc<T>, T>::create_tx_rx(capacity);
     (MPMCSender { sender: send }, MPMCReceiver { receiver: recv })
 }
 
@@ -757,14 +738,14 @@ pub fn mpmc_queue_with<T, W: Wait + 'static>(
     capacity: Index,
     w: W,
 ) -> (MPMCSender<T>, MPMCReceiver<T>) {
-    let (send, recv) = MultiQueue::<MPMC<T>, T>::create_tx_rx_with(capacity, w);
+    let (send, recv) = MultiQueue::<Mpmc<T>, T>::create_tx_rx_with(capacity, w);
     (MPMCSender { sender: send }, MPMCReceiver { receiver: recv })
 }
 
 /// Futures variant of ```mpmc_queue``` - datastructures implement
 /// Sink + Stream at a minor (~30 ns) performance cost to ```BlockingWait```
 pub fn mpmc_fut_queue<T: Clone>(capacity: Index) -> (MPMCFutSender<T>, MPMCFutReceiver<T>) {
-    let (isend, irecv) = futures_multiqueue::<MPMC<T>, T>(capacity);
+    let (isend, irecv) = futures_multiqueue::<Mpmc<T>, T>(capacity);
     (
         MPMCFutSender { sender: isend },
         MPMCFutReceiver { receiver: irecv },

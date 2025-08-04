@@ -301,7 +301,7 @@
 //! }
 //! ```
 
-#![cfg_attr(clippy, allow(clippy::inline_always))]
+#![allow(clippy::inline_always)]
 
 mod alloc;
 mod atomicsignal;

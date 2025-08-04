@@ -171,7 +171,7 @@ fn bench_broadcast_queue(c: &mut Criterion) {
                             handle.join().unwrap();
                         }
                         
-                        let expected_sum: usize = (0..MESSAGE_COUNT).sum::<usize>() * streams * consumers_per_stream;
+                        let expected_sum: usize = (0..MESSAGE_COUNT).sum::<usize>() * streams;
                         assert_eq!(counter.load(Ordering::Relaxed), expected_sum);
                     });
                 },

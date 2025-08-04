@@ -68,7 +68,7 @@ fn validate_wrap(val: Index) {
 }
 
 // A queue entry will never ever have this value as an initial valid flag
-pub const INITIAL_QUEUE_FLAG: usize = ::std::usize::MAX;
+pub const INITIAL_QUEUE_FLAG: usize = usize::MAX;
 
 pub struct CountedIndex {
     val: AtomicUsize,

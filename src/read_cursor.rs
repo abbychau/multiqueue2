@@ -62,13 +62,10 @@ impl<'a> ReadAttempt<'a> {
                 self.linked.commit_direct(by, ord);
                 None
             }
-            ReaderState::Multi => match self.linked.commit(by, ord) {
-                Some(transaction) => Some(ReadAttempt {
+            ReaderState::Multi => self.linked.commit(by, ord).map(|transaction| ReadAttempt {
                     linked: transaction,
                     state: ReaderState::Multi,
                 }),
-                None => None,
-            },
         }
     }
 
